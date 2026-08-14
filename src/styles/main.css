@@ -54,8 +54,16 @@ body {
   background-color: var(--bg-main);
   color: var(--text-main);
   min-height: 100vh;
+  min-height: 100dvh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Prevent iOS auto-zoom on input focus (font below 16px triggers zoom) */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* App Container */
@@ -63,7 +71,8 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  padding-bottom: 70px; /* Space for mobile bottom bar */
+  min-height: 100dvh;
+  padding-bottom: calc(70px + env(safe-area-inset-bottom)); /* Space for mobile bottom bar */
 }
 
 @media (min-width: 768px) {
@@ -79,7 +88,7 @@ body {
 .navbar {
   background: #0f172a;
   color: #ffffff;
-  padding: 0.75rem 1.25rem;
+  padding: calc(0.75rem + env(safe-area-inset-top)) 1.25rem 0.75rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -184,7 +193,7 @@ body {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 0.35rem 0.5rem;
+  padding: calc(0.35rem + env(safe-area-inset-bottom)) 0.5rem 0.35rem;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.15);
   z-index: 50;
   border-top: 1px solid #1e293b;
@@ -253,7 +262,7 @@ body {
 /* Toast Notification */
 .toast-container {
   position: fixed;
-  bottom: 5rem;
+  bottom: calc(5rem + env(safe-area-inset-bottom));
   right: 1rem;
   left: 1rem;
   z-index: 100;
@@ -1209,6 +1218,7 @@ body {
   max-height: 90vh;
   box-shadow: var(--shadow-lg);
   overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom);
   animation: slideUpModal 0.25s ease-out;
 }
 
@@ -1411,7 +1421,7 @@ body {
 .pwa-install-card {
   position: fixed;
   right: 14px;
-  bottom: 86px;
+  bottom: calc(86px + env(safe-area-inset-bottom));
   z-index: 95;
   width: min(320px, calc(100vw - 28px));
   background: #0f172a;

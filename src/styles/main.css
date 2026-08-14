@@ -1,5 +1,5 @@
 /* =========================================================
-   MEGA TEKNIK - MODERN POINT OF SALE & THERMAL PRINT SYSTEM
+   MEGA TEHNIK ELEKTRONIK - MODERN POINT OF SALE & THERMAL PRINT SYSTEM
    Mobile-First & Universal 58mm Thermal Printer Optimized
    ========================================================= */
 
@@ -96,16 +96,21 @@ body {
 }
 
 .brand-icon {
-  background: linear-gradient(135deg, #2563eb, #38bdf8);
-  color: white;
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-md);
+  background: transparent;
+  width: 46px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
   flex-shrink: 0;
+}
+
+.brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
 }
 
 .brand-info h1 {
@@ -1382,4 +1387,116 @@ body {
   font-size: 1.15rem;
   font-weight: 800;
   color: var(--text-main);
+}
+
+/* =========================================================
+   PWA - INSTALL BANNER & OFFLINE INDICATOR
+   ========================================================= */
+
+.offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #fef3c7;
+  color: #78350f;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  z-index: 45;
+  flex-shrink: 0;
+}
+
+.pwa-install-card {
+  position: fixed;
+  right: 14px;
+  bottom: 86px;
+  z-index: 95;
+  width: min(320px, calc(100vw - 28px));
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid #1e293b;
+  padding: 1rem 1rem 0.9rem;
+  position: relative;
+}
+
+.pwa-install-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: #1e293b;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pwa-install-close:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.pwa-install-logo {
+  display: block;
+  margin-bottom: 0.6rem;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
+}
+
+.pwa-install-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+}
+
+.pwa-install-desc {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-bottom: 0.7rem;
+  line-height: 1.45;
+}
+
+.pwa-share-icon {
+  display: inline-block;
+  vertical-align: -2px;
+  color: #38bdf8;
+}
+
+.pwa-install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  justify-content: center;
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #2563eb, #38bdf8);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.05s ease;
+}
+
+.pwa-install-btn:hover {
+  filter: brightness(1.08);
+}
+
+.pwa-install-btn:active {
+  transform: scale(0.98);
+}
+
+@media (min-width: 768px) {
+  .pwa-install-card {
+    bottom: 20px;
+  }
 }

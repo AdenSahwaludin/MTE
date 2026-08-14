@@ -10,6 +10,7 @@ import { KasirView } from './components/KasirView';
 import { ProductListView } from './components/ProductListView';
 import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
+import { InstallBanner, OfflineBanner } from './components/PwaBanners';
 import './styles/main.css';
 import './styles/print.css';
 import { CheckCircle2, Info } from 'lucide-react';
@@ -61,6 +62,8 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container">
+      <OfflineBanner />
+
       {/* Navigation Header */}
       <Navbar
         currentTab={currentTab}
@@ -119,6 +122,9 @@ export const App: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* PWA Install Banner */}
+      <InstallBanner />
     </div>
   );
 };

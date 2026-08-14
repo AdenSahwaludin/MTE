@@ -1,7 +1,7 @@
 import { Product, StoreProfile } from '../types';
 
 export const DEFAULT_STORE_PROFILE: StoreProfile = {
-  name: 'MEGA TEKNIK',
+  name: 'Mega Tehnik Elektronik',
   tagline: 'Solusi Alat Teknik & Bahan Bangunan',
   address: 'Jl. Raya Teknik No. 88, Pertokoan Mega Niaga',
   phone: '0812-3456-7890 / 0878-1122-3344',

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, Package, History, Settings, Wrench } from 'lucide-react';
+import { ShoppingCart, Package, History, Settings } from 'lucide-react';
 import { StoreProfile } from '../types';
 
 export type NavTab = 'kasir' | 'products' | 'history' | 'settings';
@@ -23,7 +23,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <header className="navbar no-print">
         <div className="brand-section">
           <div className="brand-icon">
-            <Wrench size={20} />
+            <img className="brand-logo-img" src="/logo.webp" alt="Logo Mega Tehnik Elektronik" />
           </div>
           <div className="brand-info">
             <h1>{storeProfile.name}</h1>

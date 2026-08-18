@@ -25,7 +25,6 @@ function formatTwoColumns(left: string, right: string, width = LINE_WIDTH): stri
   if (spaceNeeded > 0) {
     return leftTrim + ' '.repeat(spaceNeeded) + rightTrim;
   }
-  // If too long, truncate or wrap
   return leftTrim + ' ' + rightTrim;
 }
 
@@ -110,6 +109,239 @@ export function generateReceiptPlainText(
 }
 
 /**
+ * Generate structured Thermer JSON with 'entries' array required by Thermer iOS / Android
+ */
+export function generateThermerJson(
+  transaction: Transaction,
+  storeProfile: StoreProfile
+): { entries: any[] } {
+  const entries: any[] = [];
+
+  // Header Toko
+  entries.push({
+    type: 'text',
+    content: storeProfile.name.toUpperCase(),
+    bold: 1,
+    align: 1,
+    format: 2, // Large / double size header
+  });
+
+  if (storeProfile.tagline) {
+    entries.push({
+      type: 'text',
+      content: storeProfile.tagline,
+      bold: 0,
+      align: 1,
+      format: 0,
+    });
+  }
+
+  if (storeProfile.address) {
+    entries.push({
+      type: 'text',
+      content: storeProfile.address,
+      bold: 0,
+      align: 1,
+      format: 0,
+    });
+  }
+
+  if (storeProfile.phone) {
+    entries.push({
+      type: 'text',
+      content: `Telp: ${storeProfile.phone}`,
+      bold: 0,
+      align: 1,
+      format: 0,
+    });
+  }
+
+  // Divider ganda
+  entries.push({
+    type: 'text',
+    content: '================================',
+    bold: 0,
+    align: 1,
+    format: 0,
+  });
+
+  // Metadata
+  entries.push({
+    type: 'text',
+    content: `No: ${transaction.invoiceNo}`,
+    bold: 0,
+    align: 0,
+    format: 0,
+  });
+
+  if (storeProfile.showDateTime) {
+    entries.push({
+      type: 'text',
+      content: `Tgl: ${formatDateIndo(transaction.date)}`,
+      bold: 0,
+      align: 0,
+      format: 0,
+    });
+  }
+
+  if (storeProfile.showCashierName && storeProfile.cashierName) {
+    const cashierLine = `Kasir: ${storeProfile.cashierName}` + (transaction.customerName ? ` | Plg: ${transaction.customerName}` : '');
+    entries.push({
+      type: 'text',
+      content: cashierLine,
+      bold: 0,
+      align: 0,
+      format: 0,
+    });
+  } else if (transaction.customerName) {
+    entries.push({
+      type: 'text',
+      content: `Plg: ${transaction.customerName}`,
+      bold: 0,
+      align: 0,
+      format: 0,
+    });
+  }
+
+  // Divider putus-putus
+  entries.push({
+    type: 'text',
+    content: '--------------------------------',
+    bold: 0,
+    align: 1,
+    format: 0,
+  });
+
+  // Daftar Barang
+  transaction.items.forEach((item) => {
+    // Baris nama barang (bold)
+    entries.push({
+      type: 'text',
+      content: item.name,
+      bold: 1,
+      align: 0,
+      format: 0,
+    });
+
+    // Baris qty x harga dan subtotal rata kanan
+    const left = ` ${item.qty} ${item.unit || 'pcs'} x ${formatRupiah(item.price)}`;
+    const right = formatRupiah(item.subtotal);
+    const spaceNeeded = Math.max(1, 32 - left.length - right.length);
+    const itemCalc = left + ' '.repeat(spaceNeeded) + right;
+
+    entries.push({
+      type: 'text',
+      content: itemCalc,
+      bold: 0,
+      align: 0,
+      format: 0,
+    });
+  });
+
+  // Divider putus-putus
+  entries.push({
+    type: 'text',
+    content: '--------------------------------',
+    bold: 0,
+    align: 1,
+    format: 0,
+  });
+
+  // Total
+  const totalLeft = 'TOTAL';
+  const totalRight = formatRupiah(transaction.totalAmount);
+  const totalSpace = Math.max(1, 32 - totalLeft.length - totalRight.length);
+  entries.push({
+    type: 'text',
+    content: totalLeft + ' '.repeat(totalSpace) + totalRight,
+    bold: 1,
+    align: 0,
+    format: 1,
+  });
+
+  // Tunai
+  const cashLeft = 'TUNAI / BAYAR';
+  const cashRight = formatRupiah(transaction.cashAmount);
+  const cashSpace = Math.max(1, 32 - cashLeft.length - cashRight.length);
+  entries.push({
+    type: 'text',
+    content: cashLeft + ' '.repeat(cashSpace) + cashRight,
+    bold: 0,
+    align: 0,
+    format: 0,
+  });
+
+  // Kembalian
+  const changeLeft = 'KEMBALIAN';
+  const changeRight = formatRupiah(Math.max(0, transaction.changeAmount));
+  const changeSpace = Math.max(1, 32 - changeLeft.length - changeRight.length);
+  entries.push({
+    type: 'text',
+    content: changeLeft + ' '.repeat(changeSpace) + changeRight,
+    bold: 0,
+    align: 0,
+    format: 0,
+  });
+
+  // Catatan Struk (jika ada)
+  if (transaction.notes) {
+    entries.push({
+      type: 'text',
+      content: '--------------------------------',
+      bold: 0,
+      align: 1,
+      format: 0,
+    });
+    entries.push({
+      type: 'text',
+      content: `Catatan: ${transaction.notes}`,
+      bold: 0,
+      align: 0,
+      format: 0,
+    });
+  }
+
+  // Divider ganda
+  entries.push({
+    type: 'text',
+    content: '================================',
+    bold: 0,
+    align: 1,
+    format: 0,
+  });
+
+  // Pesan Footer
+  if (storeProfile.footerNote) {
+    entries.push({
+      type: 'text',
+      content: storeProfile.footerNote,
+      bold: 0,
+      align: 1,
+      format: 0,
+    });
+  }
+
+  entries.push({
+    type: 'text',
+    content: '*** TERIMA KASIH ***',
+    bold: 1,
+    align: 1,
+    format: 0,
+  });
+
+  // Extra line feed
+  entries.push({
+    type: 'text',
+    content: '\n\n',
+    bold: 0,
+    align: 1,
+    format: 0,
+  });
+
+  return { entries };
+}
+
+/**
  * Encode string to Base64 safely with UTF-8 support
  */
 function utf8ToBase64(str: string): string {
@@ -131,7 +363,6 @@ export function printViaRawBT(
   const rawbtSchemeUrl = `rawbt:data:text/plain;charset=utf-8;base64,${base64Data}`;
 
   try {
-    // For Android Chrome, the Android Intent syntax is standard and most reliable
     const isAndroid = /android/i.test(navigator.userAgent);
     if (isAndroid) {
       window.location.href = rawbtIntentUrl;
@@ -146,33 +377,22 @@ export function printViaRawBT(
 }
 
 /**
- * Send receipt directly to Thermer app on iOS (via deep link scheme / Web Share)
+ * Send receipt directly to Thermer app on iOS (via deep link schema with 'entries' JSON)
  */
 export function printViaThermer(
   transaction: Transaction,
   storeProfile: StoreProfile
 ): boolean {
-  const plainText = generateReceiptPlainText(transaction, storeProfile);
-  const encodedText = encodeURIComponent(plainText);
-  const base64Data = utf8ToBase64(plainText);
+  const thermerJson = generateThermerJson(transaction, storeProfile);
+  const jsonString = JSON.stringify(thermerJson);
+  const encodedJson = encodeURIComponent(jsonString);
 
-  // Thermer URL Schemes
-  const thermerUrl = `thermer://print?data=${encodedText}`;
-  const thermerSchemeUrl = `thermer:data:text/plain;base64,${base64Data}`;
+  // Thermer expects JSON payload with { "entries": [...] } in 'data' parameter
+  const thermerUrl = `thermer://print?data=${encodedJson}`;
 
   try {
-    // Attempt deep link to Thermer app on iOS
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = thermerUrl;
-    document.body.appendChild(iframe);
-
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-      // If still on page, try direct href navigation
-      window.location.href = thermerUrl;
-    }, 100);
-
+    // Trigger deep link navigation directly
+    window.location.href = thermerUrl;
     return true;
   } catch (err) {
     console.error('Error triggering Thermer print:', err);

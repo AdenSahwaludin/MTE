@@ -1,7 +1,48 @@
 import { Transaction, StoreProfile } from '../types';
 import { formatRupiah, formatDateIndo } from '../utils/formatters';
 
-const LINE_WIDTH = 32; // 32 characters for 58mm thermal paper
+const LINE_WIDTH = 32;
+
+/**
+ * Thermer Print Entry Schema for iOS (github.com/tussharmate/ios-thermer-custom-schema)
+ */
+export interface ThermerPrintEntry {
+  /**
+   * 0 = Text Entry
+   * 1 = Image Entry
+   * 2 = Barcode Entry
+   * 3 = QR Entry
+   */
+  type: number;
+  content?: string;
+  /** 0 = Normal, 1 = Bold */
+  bold?: number;
+  /** 0 = Left, 1 = Center, 2 = Right */
+  align?: number;
+  /**
+   * 0 = Normal
+   * 1 = Double Height
+   * 2 = Double Height + Width
+   * 3 = Double Width
+   * 4 = Small
+   */
+  format?: number;
+}
+
+export type ThermerEntriesMap = Record<string, ThermerPrintEntry>;
+
+/**
+ * Format two columns (Left aligned and Right aligned) across specific width
+ */
+export function formatTwoColumns(left: string, right: string, width = 30): string {
+  const leftTrim = left.trim();
+  const rightTrim = right.trim();
+  const spaceNeeded = width - leftTrim.length - rightTrim.length;
+  if (spaceNeeded > 0) {
+    return leftTrim + ' '.repeat(spaceNeeded) + rightTrim;
+  }
+  return `${leftTrim} ${rightTrim}`;
+}
 
 /**
  * Center-align a string within the specified width
@@ -16,20 +57,7 @@ function centerText(text: string, width = LINE_WIDTH): string {
 }
 
 /**
- * Format two columns (Left aligned and Right aligned) across LINE_WIDTH
- */
-function formatTwoColumns(left: string, right: string, width = LINE_WIDTH): string {
-  const leftTrim = left.trim();
-  const rightTrim = right.trim();
-  const spaceNeeded = width - leftTrim.length - rightTrim.length;
-  if (spaceNeeded > 0) {
-    return leftTrim + ' '.repeat(spaceNeeded) + rightTrim;
-  }
-  return leftTrim + ' ' + rightTrim;
-}
-
-/**
- * Generate 32-character plain text thermal receipt formatted for 58mm ESC/POS printers
+ * Generate 32-character plain text thermal receipt formatted for 58mm ESC/POS printers (RawBT)
  */
 export function generateReceiptPlainText(
   transaction: Transaction,
@@ -54,15 +82,15 @@ export function generateReceiptPlainText(
   lines.push(doubleDivider);
 
   // 2. Metadata
-  lines.push(formatTwoColumns(`No: ${transaction.invoiceNo}`, ''));
+  lines.push(formatTwoColumns(`No: ${transaction.invoiceNo}`, '', LINE_WIDTH));
   if (storeProfile.showDateTime) {
-    lines.push(formatTwoColumns('Tgl: ' + formatDateIndo(transaction.date), ''));
+    lines.push(formatTwoColumns('Tgl: ' + formatDateIndo(transaction.date), '', LINE_WIDTH));
   }
   if (storeProfile.showCashierName && storeProfile.cashierName) {
     const cashierStr = `Kasir: ${storeProfile.cashierName}`;
     const custStr = transaction.customerName ? `Plg: ${transaction.customerName}` : '';
     if (custStr) {
-      lines.push(formatTwoColumns(cashierStr, custStr));
+      lines.push(formatTwoColumns(cashierStr, custStr, LINE_WIDTH));
     } else {
       lines.push(cashierStr);
     }
@@ -74,20 +102,18 @@ export function generateReceiptPlainText(
 
   // 3. Items List
   transaction.items.forEach((item) => {
-    // Item Name on first line
     lines.push(item.name);
-    // Qty x Price on left, Subtotal on right
     const leftCol = ` ${item.qty} ${item.unit || 'pcs'} x ${formatRupiah(item.price)}`;
     const rightCol = formatRupiah(item.subtotal);
-    lines.push(formatTwoColumns(leftCol, rightCol));
+    lines.push(formatTwoColumns(leftCol, rightCol, LINE_WIDTH));
   });
 
   lines.push(divider);
 
   // 4. Totals & Payment
-  lines.push(formatTwoColumns('TOTAL', formatRupiah(transaction.totalAmount)));
-  lines.push(formatTwoColumns('TUNAI / BAYAR', formatRupiah(transaction.cashAmount)));
-  lines.push(formatTwoColumns('KEMBALIAN', formatRupiah(Math.max(0, transaction.changeAmount))));
+  lines.push(formatTwoColumns('TOTAL', formatRupiah(transaction.totalAmount), LINE_WIDTH));
+  lines.push(formatTwoColumns('TUNAI / BAYAR', formatRupiah(transaction.cashAmount), LINE_WIDTH));
+  lines.push(formatTwoColumns('KEMBALIAN', formatRupiah(Math.max(0, transaction.changeAmount)), LINE_WIDTH));
 
   if (transaction.notes) {
     lines.push(divider);
@@ -103,242 +129,122 @@ export function generateReceiptPlainText(
   lines.push(centerText('*** TERIMA KASIH ***'));
   lines.push('');
   lines.push('');
-  lines.push(''); // 3 lines feed for tear off
+  lines.push('');
 
   return lines.join('\n');
 }
 
 /**
- * Generate structured Thermer JSON with 'entries' array required by Thermer iOS / Android
+ * Generate official Thermer iOS JSON map with sequential zero-padded keys
+ * e.g. { "000": { type: 0, content: "...", bold: 1, align: 1, format: 2 }, "001": ... }
  */
-export function generateThermerJson(
+export function generateThermerReceiptEntries(
   transaction: Transaction,
   storeProfile: StoreProfile
-): { entries: any[] } {
-  const entries: any[] = [];
+): ThermerEntriesMap {
+  const list: ThermerPrintEntry[] = [];
 
-  // Header Toko
-  entries.push({
-    type: 'text',
-    content: storeProfile.name.toUpperCase(),
-    bold: 1,
-    align: 1,
-    format: 2, // Large / double size header
-  });
+  const addText = (
+    content: string,
+    bold: number = 0,
+    align: number = 0,
+    format: number = 0
+  ) => {
+    list.push({
+      type: 0,
+      content,
+      bold,
+      align,
+      format,
+    });
+  };
 
+  // 1. NAMA TOKO (Double Height + Width, Bold, Center)
+  addText(storeProfile.name.toUpperCase(), 1, 1, 2);
+
+  // 2. TAGLINE / SUBTITLE (Normal, Center)
   if (storeProfile.tagline) {
-    entries.push({
-      type: 'text',
-      content: storeProfile.tagline,
-      bold: 0,
-      align: 1,
-      format: 0,
-    });
+    addText(storeProfile.tagline, 0, 1, 0);
   }
 
+  // 3. ALAMAT & TELP (Normal, Center)
   if (storeProfile.address) {
-    entries.push({
-      type: 'text',
-      content: storeProfile.address,
-      bold: 0,
-      align: 1,
-      format: 0,
-    });
+    addText(storeProfile.address, 0, 1, 0);
   }
-
   if (storeProfile.phone) {
-    entries.push({
-      type: 'text',
-      content: `Telp: ${storeProfile.phone}`,
-      bold: 0,
-      align: 1,
-      format: 0,
-    });
+    addText(`Telp: ${storeProfile.phone}`, 0, 1, 0);
   }
 
-  // Divider ganda
-  entries.push({
-    type: 'text',
-    content: '================================',
-    bold: 0,
-    align: 1,
-    format: 0,
-  });
+  // 4. GARIS PEMBATAS (30 Karakter aman untuk 58mm)
+  addText('------------------------------', 0, 0, 0);
 
-  // Metadata
-  entries.push({
-    type: 'text',
-    content: `No: ${transaction.invoiceNo}`,
-    bold: 0,
-    align: 0,
-    format: 0,
-  });
-
+  // 5. METADATA TRANSAKSI
+  addText(`No: ${transaction.invoiceNo}`, 0, 0, 0);
   if (storeProfile.showDateTime) {
-    entries.push({
-      type: 'text',
-      content: `Tgl: ${formatDateIndo(transaction.date)}`,
-      bold: 0,
-      align: 0,
-      format: 0,
-    });
+    addText(formatDateIndo(transaction.date), 0, 0, 0);
   }
-
   if (storeProfile.showCashierName && storeProfile.cashierName) {
     const cashierLine = `Kasir: ${storeProfile.cashierName}` + (transaction.customerName ? ` | Plg: ${transaction.customerName}` : '');
-    entries.push({
-      type: 'text',
-      content: cashierLine,
-      bold: 0,
-      align: 0,
-      format: 0,
-    });
+    addText(cashierLine, 0, 0, 0);
   } else if (transaction.customerName) {
-    entries.push({
-      type: 'text',
-      content: `Plg: ${transaction.customerName}`,
-      bold: 0,
-      align: 0,
-      format: 0,
-    });
+    addText(`Plg: ${transaction.customerName}`, 0, 0, 0);
   }
 
-  // Divider putus-putus
-  entries.push({
-    type: 'text',
-    content: '--------------------------------',
-    bold: 0,
-    align: 1,
-    format: 0,
-  });
+  // 6. GARIS PEMBATAS
+  addText('------------------------------', 0, 0, 0);
 
-  // Daftar Barang
+  // 7. DAFTAR ITEM (Digabung 1 entry per item dengan \n untuk mencegah BLE packet burst)
   transaction.items.forEach((item) => {
-    // Baris nama barang (bold)
-    entries.push({
-      type: 'text',
-      content: item.name,
-      bold: 1,
-      align: 0,
-      format: 0,
-    });
+    const displayName = item.name;
+    const leftPart = ` ${item.qty} ${item.unit || 'pcs'} x ${formatRupiah(item.price)}`;
+    const rightPart = formatRupiah(item.subtotal);
+    const itemLine = formatTwoColumns(leftPart, rightPart, 30);
 
-    // Baris qty x harga dan subtotal rata kanan
-    const left = ` ${item.qty} ${item.unit || 'pcs'} x ${formatRupiah(item.price)}`;
-    const right = formatRupiah(item.subtotal);
-    const spaceNeeded = Math.max(1, 32 - left.length - right.length);
-    const itemCalc = left + ' '.repeat(spaceNeeded) + right;
-
-    entries.push({
-      type: 'text',
-      content: itemCalc,
-      bold: 0,
-      align: 0,
-      format: 0,
-    });
+    addText(`${displayName}\n${itemLine}`, 0, 0, 0);
   });
 
-  // Divider putus-putus
-  entries.push({
-    type: 'text',
-    content: '--------------------------------',
-    bold: 0,
-    align: 1,
-    format: 0,
-  });
+  // 8. GARIS PEMBATAS
+  addText('------------------------------', 0, 0, 0);
 
-  // Total
-  const totalLeft = 'TOTAL';
-  const totalRight = formatRupiah(transaction.totalAmount);
-  const totalSpace = Math.max(1, 32 - totalLeft.length - totalRight.length);
-  entries.push({
-    type: 'text',
-    content: totalLeft + ' '.repeat(totalSpace) + totalRight,
-    bold: 1,
-    align: 0,
-    format: 1,
-  });
+  // 9. TOTAL PEMBAYARAN
+  const totalLine = formatTwoColumns('TOTAL', formatRupiah(transaction.totalAmount), 30);
+  addText(totalLine, 1, 0, 0);
 
-  // Tunai
-  const cashLeft = 'TUNAI / BAYAR';
-  const cashRight = formatRupiah(transaction.cashAmount);
-  const cashSpace = Math.max(1, 32 - cashLeft.length - cashRight.length);
-  entries.push({
-    type: 'text',
-    content: cashLeft + ' '.repeat(cashSpace) + cashRight,
-    bold: 0,
-    align: 0,
-    format: 0,
-  });
+  // 10. JUMLAH BAYAR & KEMBALIAN
+  const paidLine = formatTwoColumns('TUNAI / BAYAR', formatRupiah(transaction.cashAmount), 30);
+  addText(paidLine, 0, 0, 0);
 
-  // Kembalian
-  const changeLeft = 'KEMBALIAN';
-  const changeRight = formatRupiah(Math.max(0, transaction.changeAmount));
-  const changeSpace = Math.max(1, 32 - changeLeft.length - changeRight.length);
-  entries.push({
-    type: 'text',
-    content: changeLeft + ' '.repeat(changeSpace) + changeRight,
-    bold: 0,
-    align: 0,
-    format: 0,
-  });
+  const changeLine = formatTwoColumns('KEMBALIAN', formatRupiah(Math.max(0, transaction.changeAmount)), 30);
+  addText(changeLine, 1, 0, 0);
 
-  // Catatan Struk (jika ada)
+  // 11. CATATAN
   if (transaction.notes) {
-    entries.push({
-      type: 'text',
-      content: '--------------------------------',
-      bold: 0,
-      align: 1,
-      format: 0,
-    });
-    entries.push({
-      type: 'text',
-      content: `Catatan: ${transaction.notes}`,
-      bold: 0,
-      align: 0,
-      format: 0,
-    });
+    addText('------------------------------', 0, 0, 0);
+    addText(`Catatan: ${transaction.notes}`, 0, 0, 0);
   }
 
-  // Divider ganda
-  entries.push({
-    type: 'text',
-    content: '================================',
-    bold: 0,
-    align: 1,
-    format: 0,
-  });
+  // 12. GARIS PENUTUP
+  addText('==============================', 0, 0, 0);
 
-  // Pesan Footer
+  // 13. FOOTER / UCAPAN (Center)
   if (storeProfile.footerNote) {
-    entries.push({
-      type: 'text',
-      content: storeProfile.footerNote,
-      bold: 0,
-      align: 1,
-      format: 0,
-    });
+    addText(storeProfile.footerNote, 0, 1, 0);
+  }
+  addText('*** TERIMA KASIH ***', 1, 1, 0);
+
+  // Convert array to sequential integer dictionary with 3-digit zero-padding:
+  // e.g. { "000": entry0, "001": entry1, ..., "018": entry18 }
+  // This is the EXACT schema expected by Thermer iOS app
+  const entriesMap: ThermerEntriesMap = {};
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    if (item) {
+      const key = i.toString().padStart(3, '0');
+      entriesMap[key] = item;
+    }
   }
 
-  entries.push({
-    type: 'text',
-    content: '*** TERIMA KASIH ***',
-    bold: 1,
-    align: 1,
-    format: 0,
-  });
-
-  // Extra line feed
-  entries.push({
-    type: 'text',
-    content: '\n\n',
-    bold: 0,
-    align: 1,
-    format: 0,
-  });
-
-  return { entries };
+  return entriesMap;
 }
 
 /**
@@ -376,22 +282,33 @@ export function printViaRawBT(
   }
 }
 
+// Module-level cooldown lock to prevent duplicate BLE connection bursts on iOS
+let lastThermerPrintTimestamp = 0;
+
 /**
- * Send receipt directly to Thermer app on iOS (via deep link schema with 'entries' JSON)
+ * Send receipt directly to Thermer app on iOS (via official custom scheme `thermer://?data=`)
  */
 export function printViaThermer(
   transaction: Transaction,
   storeProfile: StoreProfile
 ): boolean {
-  const thermerJson = generateThermerJson(transaction, storeProfile);
-  const jsonString = JSON.stringify(thermerJson);
+  if (typeof window === 'undefined') return false;
+
+  const now = Date.now();
+  // Enforce 1.5s cooldown to prevent multiple rapid triggers that crash Thermer socket
+  if (now - lastThermerPrintTimestamp < 1500) {
+    return false;
+  }
+  lastThermerPrintTimestamp = now;
+
+  const entriesMap = generateThermerReceiptEntries(transaction, storeProfile);
+  const jsonString = JSON.stringify(entriesMap);
   const encodedJson = encodeURIComponent(jsonString);
 
-  // Thermer expects JSON payload with { "entries": [...] } in 'data' parameter
-  const thermerUrl = `thermer://print?data=${encodedJson}`;
+  // Official Thermer custom scheme URL: thermer://?data={jsonMap}
+  const thermerUrl = `thermer://?data=${encodedJson}`;
 
   try {
-    // Trigger deep link navigation directly
     window.location.href = thermerUrl;
     return true;
   } catch (err) {

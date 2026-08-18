@@ -10,6 +10,7 @@ import { KasirView } from './components/KasirView';
 import { ProductListView } from './components/ProductListView';
 import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
+import { ThermalReceipt } from './components/ThermalReceipt';
 import { InstallBanner, OfflineBanner } from './components/PwaBanners';
 import './styles/main.css';
 import './styles/print.css';
@@ -27,6 +28,7 @@ export const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [storeProfile, setStoreProfile] = useState<StoreProfile>(getStoreProfile());
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [printTransaction, setPrintTransaction] = useState<Transaction | null>(null);
 
   // Load all initial data
   const loadData = useCallback(() => {
@@ -60,72 +62,93 @@ export const App: React.FC = () => {
     setStoreProfile(newProfile);
   };
 
-  return (
-    <div className="app-container">
-      <OfflineBanner />
+  // Centralized Print Receipt Handler
+  const handlePrintReceipt = (trx: Transaction) => {
+    setPrintTransaction(trx);
+    // Short timeout to guarantee DOM update with transaction data before opening print preview
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
 
-      {/* Navigation Header */}
-      <Navbar
-        currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        productCount={products.length}
+  return (
+    <>
+      {/* Global Thermal Receipt - Only visible when printing (@media print) */}
+      <ThermalReceipt
+        transaction={printTransaction}
         storeProfile={storeProfile}
       />
 
-      {/* Main Dynamic View */}
-      <main className="main-content no-print">
-        {currentTab === 'kasir' && (
-          <KasirView
-            storeProfile={storeProfile}
-            onProductUpdated={handleProductUpdated}
-            showToast={showToast}
-          />
-        )}
+      {/* Main Interactive App Container - Hidden when printing */}
+      <div className="app-container no-print">
+        <OfflineBanner />
 
-        {currentTab === 'products' && (
-          <ProductListView
-            products={products}
-            onRefresh={handleProductUpdated}
-            showToast={showToast}
-          />
-        )}
+        {/* Navigation Header */}
+        <Navbar
+          currentTab={currentTab}
+          onSelectTab={setCurrentTab}
+          productCount={products.length}
+          storeProfile={storeProfile}
+        />
 
-        {currentTab === 'history' && (
-          <HistoryView
-            transactions={transactions}
-            storeProfile={storeProfile}
-            onRefresh={handleTransactionUpdated}
-            showToast={showToast}
-          />
-        )}
+        {/* Main Dynamic View */}
+        <main className="main-content">
+          {currentTab === 'kasir' && (
+            <KasirView
+              storeProfile={storeProfile}
+              onProductUpdated={handleProductUpdated}
+              onTransactionCreated={handleTransactionUpdated}
+              onPrintReceipt={handlePrintReceipt}
+              showToast={showToast}
+            />
+          )}
 
-        {currentTab === 'settings' && (
-          <SettingsView
-            storeProfile={storeProfile}
-            onUpdateProfile={handleProfileUpdated}
-            showToast={showToast}
-            onDataReset={loadData}
-          />
-        )}
-      </main>
+          {currentTab === 'products' && (
+            <ProductListView
+              products={products}
+              onRefresh={handleProductUpdated}
+              showToast={showToast}
+            />
+          )}
 
-      {/* Floating Toast Alerts */}
-      <div className="toast-container no-print">
-        {toasts.map((toast) => (
-          <div key={toast.id} className={`toast ${toast.type}`}>
-            {toast.type === 'success' ? (
-              <CheckCircle2 size={18} color="#10b981" />
-            ) : (
-              <Info size={18} color="#38bdf8" />
-            )}
-            <span>{toast.text}</span>
-          </div>
-        ))}
+          {currentTab === 'history' && (
+            <HistoryView
+              transactions={transactions}
+              storeProfile={storeProfile}
+              onRefresh={handleTransactionUpdated}
+              onPrintReceipt={handlePrintReceipt}
+              showToast={showToast}
+            />
+          )}
+
+          {currentTab === 'settings' && (
+            <SettingsView
+              storeProfile={storeProfile}
+              onUpdateProfile={handleProfileUpdated}
+              showToast={showToast}
+              onDataReset={loadData}
+            />
+          )}
+        </main>
+
+        {/* Floating Toast Alerts */}
+        <div className="toast-container">
+          {toasts.map((toast) => (
+            <div key={toast.id} className={`toast ${toast.type}`}>
+              {toast.type === 'success' ? (
+                <CheckCircle2 size={18} color="#10b981" />
+              ) : (
+                <Info size={18} color="#38bdf8" />
+              )}
+              <span>{toast.text}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* PWA Install Banner */}
+        <InstallBanner />
       </div>
-
-      {/* PWA Install Banner */}
-      <InstallBanner />
-    </div>
+    </>
   );
 };
 

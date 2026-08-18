@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Transaction, StoreProfile } from '../types';
 import { deleteTransaction } from '../services/storageService';
+import { printViaRawBT, printViaThermer } from '../services/directPrintService';
 import { formatRupiah, formatDateIndo } from '../utils/formatters';
-import { ThermalReceipt } from './ThermalReceipt';
 import {
   History,
   Printer,
@@ -13,12 +13,15 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
+  Smartphone,
+  Share2,
 } from 'lucide-react';
 
 interface HistoryViewProps {
   transactions: Transaction[];
   storeProfile: StoreProfile;
   onRefresh: () => void;
+  onPrintReceipt: (trx: Transaction) => void;
   showToast: (msg: string, type?: 'success' | 'info') => void;
 }
 
@@ -26,11 +29,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   transactions,
   storeProfile,
   onRefresh,
+  onPrintReceipt,
   showToast,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [reprintTransaction, setReprintTransaction] = useState<Transaction | null>(null);
 
   // Filter transactions
   const filtered = transactions.filter((t) => {
@@ -49,11 +52,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   const todayOmset = todayTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
 
   const handleReprint = (t: Transaction) => {
-    setReprintTransaction(t);
     showToast(`Mencetak ulang struk ${t.invoiceNo}...`, 'info');
-    setTimeout(() => {
-      window.print();
-    }, 150);
+    onPrintReceipt(t);
+  };
+
+  const handleReprintRawBT = (t: Transaction) => {
+    showToast(`⚡ Mengirim ulang ke RawBT Android (${t.invoiceNo})...`, 'success');
+    printViaRawBT(t, storeProfile);
+  };
+
+  const handleReprintThermer = (t: Transaction) => {
+    showToast(`🍎 Membuka Thermer iOS (${t.invoiceNo})...`, 'success');
+    printViaThermer(t, storeProfile);
   };
 
   const handleDelete = (id: string, invoiceNo: string) => {
@@ -66,14 +76,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
   return (
     <div className="product-view-container">
-      {/* Printable Receipt element for Re-print */}
-      {reprintTransaction && (
-        <ThermalReceipt
-          transaction={reprintTransaction}
-          storeProfile={storeProfile}
-        />
-      )}
-
       {/* Header */}
       <div className="page-header-row">
         <div className="page-title">
@@ -237,9 +239,37 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                                   </li>
                                 ))}
                               </ul>
-                              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end', gap: '1.5rem', fontSize: '0.8rem', color: '#475569' }}>
-                                <span>Bayar: <strong>{formatRupiah(t.cashAmount)}</strong></span>
-                                <span>Kembalian: <strong>{formatRupiah(t.changeAmount)}</strong></span>
+                              <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReprint(t)}
+                                    className="btn-outline"
+                                    style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  >
+                                    <Printer size={13} /> Cetak Browser
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReprintRawBT(t)}
+                                    className="btn-history-rawbt"
+                                    title="Cetak ulang langsung via RawBT (Android)"
+                                  >
+                                    <Smartphone size={13} /> RawBT (Android)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReprintThermer(t)}
+                                    className="btn-history-thermer"
+                                    title="Cetak ulang langsung via Thermer (iOS)"
+                                  >
+                                    <Share2 size={13} /> Thermer (iOS)
+                                  </button>
+                                </div>
+                                <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#475569' }}>
+                                  <span>Bayar: <strong>{formatRupiah(t.cashAmount)}</strong></span>
+                                  <span>Kembalian: <strong>{formatRupiah(t.changeAmount)}</strong></span>
+                                </div>
                               </div>
                             </div>
                           </td>

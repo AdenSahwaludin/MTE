@@ -1511,3 +1511,167 @@ body {
     bottom: 20px;
   }
 }
+
+/* =========================================================
+   DIRECT BLUETOOTH THERMAL PRINT BUTTONS (RawBT & Thermer)
+   ========================================================= */
+
+.direct-print-wrapper {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.direct-print-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.direct-buttons-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .direct-buttons-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Direct RawBT Button (Android) */
+.btn-direct-rawbt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.btn-direct-rawbt:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857, #059669);
+  box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-direct-rawbt:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-direct-rawbt:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+/* Direct Thermer Button (iOS) */
+.btn-direct-thermer {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.btn-direct-thermer:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+  transform: translateY(-1px);
+}
+
+.btn-direct-thermer:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-direct-thermer:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+.btn-direct-content {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.btn-direct-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.btn-direct-subtitle {
+  font-size: 0.68rem;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+/* History view mini action buttons */
+.btn-history-rawbt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-history-rawbt:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+}
+
+.btn-history-thermer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6d28d9;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-history-thermer:hover {
+  background: #ede9fe;
+  border-color: #c4b5fd;
+}
+

@@ -6,9 +6,9 @@ import {
   saveTransaction,
   generateInvoiceNumber,
 } from '../services/storageService';
+import { printViaRawBT, printViaThermer } from '../services/directPrintService';
 import { AutocompleteInput } from './AutocompleteInput';
 import { ReceiptPreview } from './ReceiptPreview';
-import { ThermalReceipt } from './ThermalReceipt';
 import { formatRupiah, formatNumber, parseNumberFromInput } from '../utils/formatters';
 import {
   Plus,
@@ -21,17 +21,24 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
+  Smartphone,
+  Share2,
+  Zap,
 } from 'lucide-react';
 
 interface KasirViewProps {
   storeProfile: StoreProfile;
   onProductUpdated: () => void;
+  onTransactionCreated?: () => void;
+  onPrintReceipt: (trx: Transaction) => void;
   showToast: (msg: string, type?: 'success' | 'info') => void;
 }
 
 export const KasirView: React.FC<KasirViewProps> = ({
   storeProfile,
   onProductUpdated,
+  onTransactionCreated,
+  onPrintReceipt,
   showToast,
 }) => {
   // Input fields for current item
@@ -46,7 +53,6 @@ export const KasirView: React.FC<KasirViewProps> = ({
   const [cashAmount, setCashAmount] = useState<string>('');
   const [customerName, setCustomerName] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  const [printTransaction, setPrintTransaction] = useState<Transaction | null>(null);
   const [showMobilePreview, setShowMobilePreview] = useState<boolean>(false);
 
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -207,12 +213,12 @@ export const KasirView: React.FC<KasirViewProps> = ({
     nameInputRef.current?.focus();
   };
 
-  // Print receipt
-  const handlePrintReceipt = () => {
+  // Helper to build and persist transaction before printing
+  const createCurrentTransaction = (): Transaction | null => {
     if (cartItems.length === 0) {
       showToast('Keranjang masih kosong, tambahkan barang terlebih dahulu', 'info');
       nameInputRef.current?.focus();
-      return;
+      return null;
     }
 
     const finalCash = numericCash > 0 ? numericCash : totalAmount;
@@ -233,34 +239,45 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
     // Save transaction to local storage
     saveTransaction(transactionData);
-    setPrintTransaction(transactionData);
+    if (onTransactionCreated) {
+      onTransactionCreated();
+    }
 
-    showToast('Memproses cetak struk...', 'success');
+    return transactionData;
+  };
 
-    // Trigger browser print dialog
-    setTimeout(() => {
-      window.print();
-      // Prepare for next transaction
-      handleResetTransaction();
-    }, 150);
+  // 1. Standard Browser Print (PC / Desktop / USB)
+  const handlePrintReceipt = () => {
+    const trx = createCurrentTransaction();
+    if (!trx) return;
+
+    showToast('Memproses cetak struk browser...', 'success');
+    onPrintReceipt(trx);
+    handleResetTransaction();
+  };
+
+  // 2. Direct RawBT Print (Android Bluetooth Thermal)
+  const handlePrintRawBT = () => {
+    const trx = createCurrentTransaction();
+    if (!trx) return;
+
+    showToast('⚡ Mengirim data ke RawBT Android (POS-58)...', 'success');
+    printViaRawBT(trx, storeProfile);
+    handleResetTransaction();
+  };
+
+  // 3. Direct Thermer Print (iOS / iPhone / iPad Bluetooth Thermal)
+  const handlePrintThermer = () => {
+    const trx = createCurrentTransaction();
+    if (!trx) return;
+
+    showToast('🍎 Membuka aplikasi Thermer iOS (POS-58)...', 'success');
+    printViaThermer(trx, storeProfile);
+    handleResetTransaction();
   };
 
   return (
     <div className="pos-layout">
-      {/* Printable Receipt element for @media print */}
-      <ThermalReceipt transaction={printTransaction || {
-        id: 'preview',
-        invoiceNo,
-        date: new Date().toISOString(),
-        items: cartItems,
-        totalAmount,
-        cashAmount: numericCash || totalAmount,
-        changeAmount: Math.max(0, changeAmount),
-        paymentMethod: 'cash',
-        customerName,
-        notes,
-      }} storeProfile={storeProfile} />
-
       {/* Main Left Column: POS Controls */}
       <div className="pos-main-panel">
         {/* Quick Add Product Card */}
@@ -590,6 +607,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
               type="button"
               className="btn-secondary-reset"
               onClick={handleResetTransaction}
+              title="Reset transaksi kasir (F4)"
             >
               <RotateCcw size={16} /> Reset (F4)
             </button>
@@ -598,9 +616,46 @@ export const KasirView: React.FC<KasirViewProps> = ({
               className="btn-primary-print"
               onClick={handlePrintReceipt}
               disabled={cartItems.length === 0}
+              title="Cetak via dialog browser / PC / USB (F2)"
             >
-              <Printer size={20} /> Cetak Struk 58mm (F2)
+              <Printer size={18} /> Cetak Struk (F2)
             </button>
+          </div>
+
+          {/* Direct Mobile Bluetooth Thermal Printing (Android RawBT & iOS Thermer) */}
+          <div className="direct-print-wrapper">
+            <div className="direct-print-header">
+              <Zap size={13} color="#f59e0b" />
+              <span>Direct Bluetooth Printer (Tanpa Dialog):</span>
+            </div>
+            <div className="direct-buttons-grid">
+              <button
+                type="button"
+                className="btn-direct-rawbt"
+                onClick={handlePrintRawBT}
+                disabled={cartItems.length === 0}
+                title="Cetak langsung ke RawBT (Android Bluetooth POS-58)"
+              >
+                <Smartphone size={16} />
+                <div className="btn-direct-content">
+                  <span className="btn-direct-title">Direct RawBT</span>
+                  <span className="btn-direct-subtitle">Android Bluetooth</span>
+                </div>
+              </button>
+              <button
+                type="button"
+                className="btn-direct-thermer"
+                onClick={handlePrintThermer}
+                disabled={cartItems.length === 0}
+                title="Cetak langsung ke Thermer (iOS / iPhone Bluetooth POS-58)"
+              >
+                <Share2 size={16} />
+                <div className="btn-direct-content">
+                  <span className="btn-direct-title">Direct Thermer</span>
+                  <span className="btn-direct-subtitle">iOS / iPhone</span>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Mobile Preview Toggle Button */}

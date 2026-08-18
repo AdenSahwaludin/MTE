@@ -11,14 +11,14 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ transaction, sto
   if (!transaction) return null;
 
   return (
-    <div id="thermal-print-target" className="paper-58mm">
+    <div id="thermal-print-target">
       <div className="thermal-receipt-container">
         {/* Header Toko */}
         <div className="thermal-header">
           <div className="thermal-store-name">{storeProfile.name}</div>
           {storeProfile.tagline && <div className="thermal-store-info">{storeProfile.tagline}</div>}
           <div className="thermal-store-info">{storeProfile.address}</div>
-          <div className="thermal-store-info">Telp: {storeProfile.phone}</div>
+          {storeProfile.phone && <div className="thermal-store-info">Telp: {storeProfile.phone}</div>}
         </div>
 
         <hr className="thermal-double-divider" />
@@ -34,12 +34,17 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ transaction, sto
             {transaction.customerName && <span>Plg: {transaction.customerName}</span>}
           </div>
         )}
+        {!storeProfile.showCashierName && transaction.customerName && (
+          <div className="thermal-meta-row">
+            <span>Plg: {transaction.customerName}</span>
+          </div>
+        )}
 
         <hr className="thermal-divider" />
 
         {/* Daftar Barang */}
         <div className="thermal-items-list">
-          {transaction.items.map((item, index) => (
+          {transaction.items && transaction.items.map((item, index) => (
             <div key={index} className="thermal-item-entry">
               <div className="thermal-item-name">{item.name}</div>
               <div className="thermal-item-detail">
@@ -73,7 +78,7 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ transaction, sto
         {transaction.notes && (
           <>
             <hr className="thermal-divider" />
-            <div style={{ fontSize: '0.85em', fontStyle: 'italic', margin: '2mm 0' }}>
+            <div style={{ fontSize: '9px', fontStyle: 'italic', margin: '1.5mm 0' }}>
               Catatan: {transaction.notes}
             </div>
           </>
@@ -83,7 +88,7 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ transaction, sto
 
         {/* Footer */}
         <div className="thermal-footer">
-          <div>{storeProfile.footerNote}</div>
+          {storeProfile.footerNote && <div>{storeProfile.footerNote}</div>}
           <div style={{ marginTop: '2mm', fontWeight: 'bold' }}>*** TERIMA KASIH ***</div>
         </div>
       </div>

@@ -86,8 +86,8 @@
   }
 
   .thermal-store-name {
-    font-size: 12px !important;
-    font-weight: 900 !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
     line-height: 1.2 !important;
@@ -171,8 +171,8 @@
   }
 
   .thermal-total-row.grand-total {
-    font-weight: 900 !important;
-    font-size: 11px !important;
+    font-weight: 700 !important;
+    font-size: 10.5px !important;
     margin: 1mm 0 !important;
     border-top: 1px dashed #000000 !important;
     border-bottom: 1px dashed #000000 !important;

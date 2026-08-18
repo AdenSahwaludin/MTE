@@ -161,8 +161,8 @@ export function generateThermerReceiptEntries(
     });
   };
 
-  // 1. NAMA TOKO (Double Height + Width, Bold, Center)
-  addText(storeProfile.name.toUpperCase(), 1, 1, 2);
+  // 1. NAMA TOKO (Bold, Center, Normal Size)
+  addText(storeProfile.name.toUpperCase(), 1, 1, 0);
 
   // 2. HEADER TOKO: Tagline, Alamat, Telp digabung dalam 1 entry center
   // Mencegah BLE RX buffer crash yang terjadi jika tiap baris dikirim sebagai entry terpisah

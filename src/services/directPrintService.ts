@@ -240,18 +240,19 @@ function utf8ToBase64(str: string): string {
 }
 
 /**
- * Send receipt directly to RawBT app on Android (via deep link intent)
+ * Send receipt directly to RawBT app on Android (via official intent / custom scheme)
  */
 export function printViaRawBT(
   transaction: Transaction,
   storeProfile: StoreProfile
 ): boolean {
   const plainText = generateReceiptPlainText(transaction, storeProfile);
-  const base64Data = utf8ToBase64(plainText);
+  const encodedText = encodeURIComponent(plainText);
 
-  // RawBT Android Intent URI & Custom Scheme
-  const rawbtIntentUrl = `intent:base64,${base64Data}#Intent;scheme=rawbt:data;package=ru.a402d.rawbtprinter;end;`;
-  const rawbtSchemeUrl = `rawbt:data:text/plain;charset=utf-8;base64,${base64Data}`;
+  // Official RawBT Intent & Scheme for plain text receipt:
+  // intent:[encodedText]#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;
+  const rawbtIntentUrl = `intent:${encodedText}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+  const rawbtSchemeUrl = `rawbt:${encodedText}`;
 
   try {
     const isAndroid = /android/i.test(navigator.userAgent);

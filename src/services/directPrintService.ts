@@ -135,8 +135,9 @@ export function generateReceiptPlainText(
 }
 
 /**
- * Generate official Thermer iOS JSON map with sequential zero-padded keys
- * e.g. { "000": { type: 0, content: "...", bold: 1, align: 1, format: 2 }, "001": ... }
+ * Generate official Thermer iOS JSON map with consolidated entries.
+ * Grouping lines with '\n' prevents Bluetooth Low Energy (BLE) packet buffer overflow
+ * on thermal printers like VSC MP-58M Pro.
  */
 export function generateThermerReceiptEntries(
   transaction: Transaction,
@@ -150,6 +151,7 @@ export function generateThermerReceiptEntries(
     align: number = 0,
     format: number = 0
   ) => {
+    if (!content || !content.trim()) return;
     list.push({
       type: 0,
       content,
@@ -162,79 +164,62 @@ export function generateThermerReceiptEntries(
   // 1. NAMA TOKO (Double Height + Width, Bold, Center)
   addText(storeProfile.name.toUpperCase(), 1, 1, 2);
 
-  // 2. TAGLINE / SUBTITLE (Normal, Center)
-  if (storeProfile.tagline) {
-    addText(storeProfile.tagline, 0, 1, 0);
+  // 2. HEADER TOKO: Tagline, Alamat, Telp digabung dalam 1 entry center
+  // Mencegah BLE RX buffer crash yang terjadi jika tiap baris dikirim sebagai entry terpisah
+  const headerLines: string[] = [];
+  if (storeProfile.tagline) headerLines.push(storeProfile.tagline);
+  if (storeProfile.address) headerLines.push(storeProfile.address);
+  if (storeProfile.phone) headerLines.push(`Telp: ${storeProfile.phone}`);
+  if (headerLines.length > 0) {
+    addText(headerLines.join('\n'), 0, 1, 0);
   }
 
-  // 3. ALAMAT & TELP (Normal, Center)
-  if (storeProfile.address) {
-    addText(storeProfile.address, 0, 1, 0);
-  }
-  if (storeProfile.phone) {
-    addText(`Telp: ${storeProfile.phone}`, 0, 1, 0);
-  }
-
-  // 4. GARIS PEMBATAS (30 Karakter aman untuk 58mm)
-  addText('------------------------------', 0, 0, 0);
-
-  // 5. METADATA TRANSAKSI
-  addText(`No: ${transaction.invoiceNo}`, 0, 0, 0);
+  // 3. METADATA TRANSAKSI (Digabung dengan pembatas 1 entry)
+  const metaLines: string[] = ['------------------------------'];
+  metaLines.push(`No: ${transaction.invoiceNo}`);
   if (storeProfile.showDateTime) {
-    addText(formatDateIndo(transaction.date), 0, 0, 0);
+    metaLines.push(`Tgl: ${formatDateIndo(transaction.date)}`);
   }
   if (storeProfile.showCashierName && storeProfile.cashierName) {
     const cashierLine = `Kasir: ${storeProfile.cashierName}` + (transaction.customerName ? ` | Plg: ${transaction.customerName}` : '');
-    addText(cashierLine, 0, 0, 0);
+    metaLines.push(cashierLine);
   } else if (transaction.customerName) {
-    addText(`Plg: ${transaction.customerName}`, 0, 0, 0);
+    metaLines.push(`Plg: ${transaction.customerName}`);
   }
+  metaLines.push('------------------------------');
+  addText(metaLines.join('\n'), 0, 0, 0);
 
-  // 6. GARIS PEMBATAS
-  addText('------------------------------', 0, 0, 0);
-
-  // 7. DAFTAR ITEM (Digabung 1 entry per item dengan \n untuk mencegah BLE packet burst)
+  // 4. DAFTAR ITEM (1 entry per item: Nama \n Qty x Harga + Subtotal)
   transaction.items.forEach((item) => {
-    const displayName = item.name;
     const leftPart = ` ${item.qty} ${item.unit || 'pcs'} x ${formatRupiah(item.price)}`;
     const rightPart = formatRupiah(item.subtotal);
     const itemLine = formatTwoColumns(leftPart, rightPart, 30);
 
-    addText(`${displayName}\n${itemLine}`, 0, 0, 0);
+    addText(`${item.name}\n${itemLine}`, 0, 0, 0);
   });
 
-  // 8. GARIS PEMBATAS
-  addText('------------------------------', 0, 0, 0);
-
-  // 9. TOTAL PEMBAYARAN
-  const totalLine = formatTwoColumns('TOTAL', formatRupiah(transaction.totalAmount), 30);
-  addText(totalLine, 1, 0, 0);
-
-  // 10. JUMLAH BAYAR & KEMBALIAN
-  const paidLine = formatTwoColumns('TUNAI / BAYAR', formatRupiah(transaction.cashAmount), 30);
-  addText(paidLine, 0, 0, 0);
-
-  const changeLine = formatTwoColumns('KEMBALIAN', formatRupiah(Math.max(0, transaction.changeAmount)), 30);
-  addText(changeLine, 1, 0, 0);
-
-  // 11. CATATAN
+  // 5. TOTAL & PEMBAYARAN (Digabung dalam 1 block)
+  const payLines: string[] = ['------------------------------'];
+  payLines.push(formatTwoColumns('TOTAL', formatRupiah(transaction.totalAmount), 30));
+  payLines.push(formatTwoColumns('TUNAI / BAYAR', formatRupiah(transaction.cashAmount), 30));
+  payLines.push(formatTwoColumns('KEMBALIAN', formatRupiah(Math.max(0, transaction.changeAmount)), 30));
   if (transaction.notes) {
-    addText('------------------------------', 0, 0, 0);
-    addText(`Catatan: ${transaction.notes}`, 0, 0, 0);
+    payLines.push('------------------------------');
+    payLines.push(`Catatan: ${transaction.notes}`);
   }
+  payLines.push('==============================');
+  addText(payLines.join('\n'), 0, 0, 0);
 
-  // 12. GARIS PENUTUP
-  addText('==============================', 0, 0, 0);
-
-  // 13. FOOTER / UCAPAN (Center)
+  // 6. FOOTER / UCAPAN TOKO (Center)
+  const footerLines: string[] = [];
   if (storeProfile.footerNote) {
-    addText(storeProfile.footerNote, 0, 1, 0);
+    footerLines.push(storeProfile.footerNote);
   }
-  addText('*** TERIMA KASIH ***', 1, 1, 0);
+  footerLines.push('*** TERIMA KASIH ***');
+  addText(footerLines.join('\n'), 1, 1, 0);
 
   // Convert array to sequential integer dictionary with 3-digit zero-padding:
-  // e.g. { "000": entry0, "001": entry1, ..., "018": entry18 }
-  // This is the EXACT schema expected by Thermer iOS app
+  // e.g. { "000": entry0, "001": entry1, ..., "006": entry6 }
   const entriesMap: ThermerEntriesMap = {};
   for (let i = 0; i < list.length; i++) {
     const item = list[i];

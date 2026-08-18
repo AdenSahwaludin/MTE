@@ -7,6 +7,7 @@ import {
   generateInvoiceNumber,
 } from '../services/storageService';
 import { printViaRawBT, printViaThermer } from '../services/directPrintService';
+import { printDirectBluetooth, isWebBluetoothSupported } from '../services/bluetoothPrintService';
 import { AutocompleteInput } from './AutocompleteInput';
 import { ReceiptPreview } from './ReceiptPreview';
 import { formatRupiah, formatNumber, parseNumberFromInput } from '../utils/formatters';
@@ -24,6 +25,7 @@ import {
   Smartphone,
   Share2,
   Zap,
+  Bluetooth,
 } from 'lucide-react';
 
 interface KasirViewProps {
@@ -246,7 +248,28 @@ export const KasirView: React.FC<KasirViewProps> = ({
     return transactionData;
   };
 
-  // 1. Standard Browser Print (PC / Desktop / USB)
+  // 1. Direct Web Bluetooth Print (Android Chrome / PC Web Bluetooth - No 3rd party app needed!)
+  const [isPrintingBt, setIsPrintingBt] = useState(false);
+
+  const handlePrintBluetooth = async () => {
+    const trx = createCurrentTransaction();
+    if (!trx) return;
+
+    try {
+      setIsPrintingBt(true);
+      showToast('🔍 Menghubungkan ke printer Bluetooth (VSC MP-58M Pro)...', 'info');
+      await printDirectBluetooth(trx, storeProfile);
+      showToast('✅ Struk berhasil dicetak ke printer Bluetooth!', 'success');
+      handleResetTransaction();
+    } catch (err: any) {
+      console.error('Bluetooth print error:', err);
+      showToast(err?.message || 'Gagal koneksi Bluetooth. Pastikan Bluetooth aktif dan pilih printer.', 'info');
+    } finally {
+      setIsPrintingBt(false);
+    }
+  };
+
+  // 2. Standard Browser Print (PC / Desktop / USB)
   const handlePrintReceipt = () => {
     const trx = createCurrentTransaction();
     if (!trx) return;
@@ -256,7 +279,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     handleResetTransaction();
   };
 
-  // 2. Direct RawBT Print (Android Bluetooth Thermal)
+  // 3. Direct RawBT Print (Android Companion App)
   const handlePrintRawBT = () => {
     const trx = createCurrentTransaction();
     if (!trx) return;
@@ -266,7 +289,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     handleResetTransaction();
   };
 
-  // 3. Direct Thermer Print (iOS / iPhone / iPad Bluetooth Thermal)
+  // 4. Direct Thermer Print (iOS Companion App)
   const handlePrintThermer = () => {
     const trx = createCurrentTransaction();
     if (!trx) return;
@@ -601,7 +624,24 @@ export const KasirView: React.FC<KasirViewProps> = ({
             />
           </div>
 
-          {/* Action Buttons */}
+          {/* Direct Bluetooth Primary Action (Web Bluetooth ESC/POS - No apps needed) */}
+          <button
+            type="button"
+            className="btn-primary-bluetooth"
+            onClick={handlePrintBluetooth}
+            disabled={cartItems.length === 0 || isPrintingBt}
+            title="Cetak langsung ke printer Bluetooth VSC MP-58M Pro via Web Bluetooth"
+          >
+            <Bluetooth size={20} className={isPrintingBt ? 'animate-spin' : ''} />
+            <div className="btn-bt-content">
+              <span className="btn-bt-title">
+                {isPrintingBt ? 'Menghubungkan Bluetooth...' : 'Cetak Bluetooth (VSC MP-58M)'}
+              </span>
+              <span className="btn-bt-subtitle">Direct ESC/POS Wireless • Android / PC</span>
+            </div>
+          </button>
+
+          {/* Action Buttons: Reset & Browser Print */}
           <div className="action-buttons-row">
             <button
               type="button"
@@ -618,15 +658,15 @@ export const KasirView: React.FC<KasirViewProps> = ({
               disabled={cartItems.length === 0}
               title="Cetak via dialog browser / PC / USB (F2)"
             >
-              <Printer size={18} /> Cetak Struk (F2)
+              <Printer size={18} /> Cetak Browser (F2)
             </button>
           </div>
 
-          {/* Direct Mobile Bluetooth Thermal Printing (Android RawBT & iOS Thermer) */}
+          {/* Alternative Mobile Companion Apps (RawBT & Thermer) */}
           <div className="direct-print-wrapper">
             <div className="direct-print-header">
               <Zap size={13} color="#f59e0b" />
-              <span>Direct Bluetooth Printer (Tanpa Dialog):</span>
+              <span>Opsi Tambahan (App Helper):</span>
             </div>
             <div className="direct-buttons-grid">
               <button
@@ -634,12 +674,12 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 className="btn-direct-rawbt"
                 onClick={handlePrintRawBT}
                 disabled={cartItems.length === 0}
-                title="Cetak langsung ke RawBT (Android Bluetooth POS-58)"
+                title="Buka via aplikasi RawBT (Android)"
               >
                 <Smartphone size={16} />
                 <div className="btn-direct-content">
-                  <span className="btn-direct-title">Direct RawBT</span>
-                  <span className="btn-direct-subtitle">Android Bluetooth</span>
+                  <span className="btn-direct-title">RawBT App</span>
+                  <span className="btn-direct-subtitle">Android Helper</span>
                 </div>
               </button>
               <button
@@ -647,11 +687,11 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 className="btn-direct-thermer"
                 onClick={handlePrintThermer}
                 disabled={cartItems.length === 0}
-                title="Cetak langsung ke Thermer (iOS / iPhone Bluetooth POS-58)"
+                title="Buka via aplikasi Thermer (iOS / iPhone)"
               >
                 <Share2 size={16} />
                 <div className="btn-direct-content">
-                  <span className="btn-direct-title">Direct Thermer</span>
+                  <span className="btn-direct-title">Thermer App</span>
                   <span className="btn-direct-subtitle">iOS / iPhone</span>
                 </div>
               </button>

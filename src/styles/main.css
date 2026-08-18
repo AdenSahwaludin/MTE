@@ -1513,6 +1513,71 @@ body {
 }
 
 /* =========================================================
+   PRIMARY DIRECT BLUETOOTH PRINT BUTTON (Web Bluetooth ESC/POS)
+   ========================================================= */
+
+.btn-primary-bluetooth {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.9rem 1.25rem;
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.35);
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.btn-primary-bluetooth:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0369a1, #0284c7);
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-primary-bluetooth:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-primary-bluetooth:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+.btn-bt-content {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.btn-bt-title {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.btn-bt-subtitle {
+  font-size: 0.72rem;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* =========================================================
    DIRECT BLUETOOTH THERMAL PRINT BUTTONS (RawBT & Thermer)
    ========================================================= */
 

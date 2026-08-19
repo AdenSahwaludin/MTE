@@ -58,6 +58,12 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html, body {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-main);
@@ -68,9 +74,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Prevent iOS auto-zoom on input focus (font below 16px triggers zoom) */
-@media (max-width: 767px) {
-  input, select, textarea {
+/* Prevent iOS & Mobile browser auto-zoom on input focus */
+@media (max-width: 768px) {
+  input, select, textarea, .form-input, .tag-input-field, .search-input {
     font-size: 16px !important;
   }
 }

@@ -1,34 +1,66 @@
-import { Product, Transaction, StoreProfile } from '../types';
-import { DEFAULT_STORE_PROFILE, INITIAL_SAMPLE_PRODUCTS } from './defaultData';
+import { Product, Transaction, StoreProfile, UserAccount } from '../types';
+import { DEFAULT_STORE_PROFILE, INITIAL_SAMPLE_PRODUCTS, DEFAULT_USERS } from './defaultData';
+import { syncService } from './syncService';
+import {
+  fetchAllUsersFromTurso,
+  upsertUserToTurso,
+  deleteUserFromTurso,
+} from './tursoClient';
 
-const STORAGE_KEYS = {
-  PRODUCTS: 'mega_teknik_products',
-  TRANSACTIONS: 'mega_teknik_transactions',
-  PROFILE: 'mega_teknik_profile',
+// Clean up legacy persistent localStorage keys immediately
+const purgeLegacyLocalStorage = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const legacyKeys = [
+      'mega_teknik_products',
+      'mega_teknik_transactions',
+      'mega_teknik_profile',
+      'mega_teknik_users',
+      'mega_teknik_sync_queue',
+      'mega_teknik_last_sync_time',
+    ];
+    legacyKeys.forEach((k) => localStorage.removeItem(k));
+  } catch (err) {
+    console.warn('Failed to clear legacy local storage:', err);
+  }
 };
 
-// --- PRODUCT SERVICES ---
+purgeLegacyLocalStorage();
+
+// Fast Reactive In-Memory State (0 ms read latency for POS autocomplete and UI)
+let inMemoryProducts: Product[] = [...INITIAL_SAMPLE_PRODUCTS];
+let inMemoryTransactions: Transaction[] = [];
+let inMemoryStoreProfile: StoreProfile = { ...DEFAULT_STORE_PROFILE };
+let inMemoryUsers: UserAccount[] = [...DEFAULT_USERS];
+
+const SESSION_AUTH_KEY = 'mega_teknik_active_session';
+
+// --- IN-MEMORY STATE SETTERS (Called by SyncService on fetch) ---
+
+export const setInMemoryProducts = (products: Product[]) => {
+  inMemoryProducts = Array.isArray(products) ? products : [];
+};
+
+export const setInMemoryTransactions = (transactions: Transaction[]) => {
+  inMemoryTransactions = Array.isArray(transactions) ? transactions : [];
+};
+
+export const setInMemoryStoreProfile = (profile: StoreProfile) => {
+  inMemoryStoreProfile = { ...DEFAULT_STORE_PROFILE, ...profile };
+};
+
+export const setInMemoryUsers = (users: UserAccount[]) => {
+  inMemoryUsers = Array.isArray(users) && users.length > 0 ? users : [...DEFAULT_USERS];
+};
+
+// --- PRODUCTS ---
+
 export const getProducts = (): Product[] => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-    if (!raw) {
-      // Initialize with default sample products
-      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(INITIAL_SAMPLE_PRODUCTS));
-      return INITIAL_SAMPLE_PRODUCTS;
-    }
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Failed to load products from storage:', err);
-    return INITIAL_SAMPLE_PRODUCTS;
-  }
+  return inMemoryProducts;
 };
 
-export const saveProductsList = (products: Product[]): void => {
-  try {
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
-  } catch (err) {
-    console.error('Failed to save products list:', err);
-  }
+export const saveProductsListDirect = (products: Product[]): void => {
+  inMemoryProducts = products;
 };
 
 export const findProductByNameOrAlias = (query: string): Product | undefined => {
@@ -36,11 +68,9 @@ export const findProductByNameOrAlias = (query: string): Product | undefined => 
   const q = query.trim().toLowerCase();
   const products = getProducts();
 
-  // Exact name match first
   const exact = products.find((p) => p.name.toLowerCase() === q);
   if (exact) return exact;
 
-  // Exact alias match
   const aliasMatch = products.find((p) =>
     p.aliases.some((a) => a.toLowerCase() === q)
   );
@@ -72,7 +102,6 @@ export const searchProducts = (query: string): SearchMatch[] => {
     }
   }
 
-  // Sort: exact startsWith first
   return results.sort((a, b) => {
     const aStartsWith = a.product.name.toLowerCase().startsWith(q);
     const bStartsWith = b.product.name.toLowerCase().startsWith(q);
@@ -90,10 +119,9 @@ export const addOrUpdateProduct = (
   category: string = 'Umum',
   id?: string
 ): { product: Product; isNew: boolean } => {
-  const products = getProducts();
+  const products = [...inMemoryProducts];
   const now = new Date().toISOString();
 
-  // If ID is given, update that product
   if (id) {
     const index = products.findIndex((p) => p.id === id);
     if (index !== -1) {
@@ -107,18 +135,17 @@ export const addOrUpdateProduct = (
         updatedAt: now,
       };
       products[index] = updatedProduct;
-      saveProductsList(products);
+      inMemoryProducts = products;
+      syncService.enqueue('UPSERT_PRODUCT', updatedProduct);
       return { product: updatedProduct, isNew: false };
     }
   }
 
-  // Check if product with same name exists
   const existingIndex = products.findIndex(
     (p) => p.name.toLowerCase() === name.trim().toLowerCase()
   );
 
   if (existingIndex !== -1) {
-    // Update existing product price and merge aliases
     const existing = products[existingIndex];
     const mergedAliases = Array.from(
       new Set([...existing.aliases, ...aliases.map((a) => a.trim()).filter(Boolean)])
@@ -132,11 +159,11 @@ export const addOrUpdateProduct = (
       updatedAt: now,
     };
     products[existingIndex] = updatedProduct;
-    saveProductsList(products);
+    inMemoryProducts = products;
+    syncService.enqueue('UPSERT_PRODUCT', updatedProduct);
     return { product: updatedProduct, isNew: false };
   }
 
-  // Create new product
   const newProduct: Product = {
     id: 'prod-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
     name: name.trim(),
@@ -149,39 +176,34 @@ export const addOrUpdateProduct = (
   };
 
   products.unshift(newProduct);
-  saveProductsList(products);
+  inMemoryProducts = products;
+  syncService.enqueue('UPSERT_PRODUCT', newProduct);
   return { product: newProduct, isNew: true };
 };
 
 export const deleteProduct = (id: string): void => {
-  const products = getProducts().filter((p) => p.id !== id);
-  saveProductsList(products);
+  inMemoryProducts = inMemoryProducts.filter((p) => p.id !== id);
+  syncService.enqueue('DELETE_PRODUCT', id);
 };
 
-// --- TRANSACTION SERVICES ---
+// --- TRANSACTIONS ---
+
 export const getTransactions = (): Transaction[] => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-    return raw ? JSON.parse(raw) : [];
-  } catch (err) {
-    console.error('Failed to load transactions:', err);
-    return [];
-  }
+  return inMemoryTransactions;
+};
+
+export const saveTransactionsListDirect = (transactions: Transaction[]): void => {
+  inMemoryTransactions = transactions;
 };
 
 export const saveTransaction = (transaction: Transaction): void => {
-  try {
-    const list = getTransactions();
-    list.unshift(transaction);
-    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(list));
-  } catch (err) {
-    console.error('Failed to save transaction:', err);
-  }
+  inMemoryTransactions = [transaction, ...inMemoryTransactions];
+  syncService.enqueue('INSERT_TRANSACTION', transaction);
 };
 
 export const deleteTransaction = (id: string): void => {
-  const list = getTransactions().filter((t) => t.id !== id);
-  localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(list));
+  inMemoryTransactions = inMemoryTransactions.filter((t) => t.id !== id);
+  syncService.enqueue('DELETE_TRANSACTION', id);
 };
 
 export const generateInvoiceNumber = (): string => {
@@ -192,37 +214,136 @@ export const generateInvoiceNumber = (): string => {
   return `MT-${dateStr}-${timeStr}${randomSuffix}`;
 };
 
-// --- STORE PROFILE SERVICES ---
+// --- STORE PROFILE ---
+
 export const getStoreProfile = (): StoreProfile => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.PROFILE);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(DEFAULT_STORE_PROFILE));
-      return DEFAULT_STORE_PROFILE;
-    }
-    return { ...DEFAULT_STORE_PROFILE, ...JSON.parse(raw) };
-  } catch (err) {
-    console.error('Failed to load store profile:', err);
-    return DEFAULT_STORE_PROFILE;
-  }
+  return inMemoryStoreProfile;
+};
+
+export const saveStoreProfileDirect = (profile: StoreProfile): void => {
+  inMemoryStoreProfile = { ...DEFAULT_STORE_PROFILE, ...profile };
 };
 
 export const saveStoreProfile = (profile: StoreProfile): void => {
+  saveStoreProfileDirect(profile);
+  syncService.enqueue('UPSERT_PROFILE', profile);
+};
+
+// --- USERS & AUTHENTICATION ---
+
+export const getUsers = (): UserAccount[] => {
+  return inMemoryUsers;
+};
+
+export const saveUsers = (users: UserAccount[]): void => {
+  inMemoryUsers = users;
+};
+
+export const addOrUpdateUser = (
+  userData: { username: string; password?: string; name: string; role: 'admin' | 'kasir' },
+  id?: string
+): UserAccount => {
+  const users = [...inMemoryUsers];
+  const now = new Date().toISOString();
+
+  if (id) {
+    const idx = users.findIndex((u) => u.id === id);
+    if (idx !== -1) {
+      const existing = users[idx];
+      const updated: UserAccount = {
+        ...existing,
+        username: userData.username.trim().toLowerCase(),
+        name: userData.name.trim(),
+        role: userData.role,
+        password: userData.password ? userData.password.trim() : existing.password,
+      };
+      users[idx] = updated;
+      inMemoryUsers = users;
+      syncService.enqueue('UPSERT_USER', updated);
+      return updated;
+    }
+  }
+
+  const existingIdx = users.findIndex(
+    (u) => u.username.toLowerCase() === userData.username.trim().toLowerCase()
+  );
+
+  if (existingIdx !== -1) {
+    const existing = users[existingIdx];
+    const updated: UserAccount = {
+      ...existing,
+      name: userData.name.trim(),
+      role: userData.role,
+      password: userData.password ? userData.password.trim() : existing.password,
+    };
+    users[existingIdx] = updated;
+    inMemoryUsers = users;
+    syncService.enqueue('UPSERT_USER', updated);
+    return updated;
+  }
+
+  const newUser: UserAccount = {
+    id: 'user-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+    username: userData.username.trim().toLowerCase(),
+    password: (userData.password || '123456').trim(),
+    name: userData.name.trim(),
+    role: userData.role,
+    createdAt: now,
+  };
+
+  users.push(newUser);
+  inMemoryUsers = users;
+  syncService.enqueue('UPSERT_USER', newUser);
+  return newUser;
+};
+
+export const deleteUser = (id: string): boolean => {
+  const users = [...inMemoryUsers];
+  const target = users.find((u) => u.id === id);
+  if (!target) return false;
+
+  const admins = users.filter((u) => u.role === 'admin');
+  if (target.role === 'admin' && admins.length <= 1) {
+    return false;
+  }
+
+  inMemoryUsers = users.filter((u) => u.id !== id);
+  syncService.enqueue('DELETE_USER', id);
+  return true;
+};
+
+// Session storage for active authentication state (resets on browser session close)
+export const getCurrentUser = (): UserAccount | null => {
   try {
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
-  } catch (err) {
-    console.error('Failed to save store profile:', err);
+    const raw = sessionStorage.getItem(SESSION_AUTH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
 };
 
-// --- BACKUP & RESTORE ---
+export const setCurrentUser = (user: UserAccount | null): void => {
+  try {
+    if (user) {
+      sessionStorage.setItem(SESSION_AUTH_KEY, JSON.stringify(user));
+    } else {
+      sessionStorage.removeItem(SESSION_AUTH_KEY);
+    }
+  } catch (err) {
+    console.error('Failed to set current user in session storage:', err);
+  }
+};
+
+// --- BACKUP & EXPORT ---
+
 export const exportDataJSON = (): string => {
   const data = {
     exportedAt: new Date().toISOString(),
-    version: '1.0',
+    version: '1.2',
     profile: getStoreProfile(),
     products: getProducts(),
     transactions: getTransactions(),
+    users: getUsers(),
   };
   return JSON.stringify(data, null, 2);
 };
@@ -231,14 +352,18 @@ export const importDataJSON = (jsonStr: string): boolean => {
   try {
     const data = JSON.parse(jsonStr);
     if (data.products && Array.isArray(data.products)) {
-      saveProductsList(data.products);
+      inMemoryProducts = data.products;
     }
     if (data.profile) {
-      saveStoreProfile(data.profile);
+      inMemoryStoreProfile = { ...DEFAULT_STORE_PROFILE, ...data.profile };
     }
     if (data.transactions && Array.isArray(data.transactions)) {
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(data.transactions));
+      inMemoryTransactions = data.transactions;
     }
+    if (data.users && Array.isArray(data.users)) {
+      inMemoryUsers = data.users;
+    }
+    syncService.uploadAllLocalDataToTurso();
     return true;
   } catch (err) {
     console.error('Import failed:', err);

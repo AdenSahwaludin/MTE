@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Product, Transaction, StoreProfile } from './types';
+import { Product, Transaction, StoreProfile, UserAccount } from './types';
 import {
   getProducts,
   getTransactions,
   getStoreProfile,
+  getCurrentUser,
+  setCurrentUser,
 } from './services/storageService';
+import { syncService } from './services/syncService';
 import { Navbar, NavTab } from './components/Navbar';
 import { KasirView } from './components/KasirView';
 import { ProductListView } from './components/ProductListView';
@@ -12,6 +15,9 @@ import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
 import { ThermalReceipt } from './components/ThermalReceipt';
 import { InstallBanner, OfflineBanner } from './components/PwaBanners';
+import { SplashScreen } from './components/SplashScreen';
+import { LoginView } from './components/LoginView';
+import { isAppOrPwa } from './utils/platform';
 import './styles/main.css';
 import './styles/print.css';
 import { CheckCircle2, Info } from 'lucide-react';
@@ -23,6 +29,15 @@ interface ToastMessage {
 }
 
 export const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return (
+      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('mega_teknik_auth') === 'true') ||
+      (typeof localStorage !== 'undefined' && localStorage.getItem('mega_teknik_auth') === 'true')
+    );
+  });
+  const [currentUser, setCurrentUserState] = useState<UserAccount | null>(() => getCurrentUser());
+  const [showSplash, setShowSplash] = useState<boolean>(() => isAppOrPwa() && isAuthenticated);
+  const [isSplashPreview, setIsSplashPreview] = useState<boolean>(false);
   const [currentTab, setCurrentTab] = useState<NavTab>('kasir');
   const [products, setProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -30,7 +45,6 @@ export const App: React.FC = () => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [printTransaction, setPrintTransaction] = useState<Transaction | null>(null);
 
-  // Load all initial data
   const loadData = useCallback(() => {
     setProducts(getProducts());
     setTransactions(getTransactions());
@@ -38,16 +52,52 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (!isAuthenticated) return;
 
-  // Toast notification helper
+    loadData();
+
+    const unsubRefresh = syncService.onDataRefresh(() => {
+      loadData();
+    });
+
+    syncService.syncNow().catch((err) => {
+      console.warn('Initial Turso sync background notice:', err);
+    });
+
+    return () => {
+      unsubRefresh();
+    };
+  }, [isAuthenticated, loadData]);
+
   const showToast = (text: string, type: 'success' | 'info' = 'info') => {
     const id = 'toast-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
     setToasts((prev) => [...prev, { id, text, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3500);
+  };
+
+  const handleLoginSuccess = (user: UserAccount) => {
+    setCurrentUserState(user);
+    setIsAuthenticated(true);
+    showToast(`Selamat datang, ${user.name}! Masuk sebagai ${user.role === 'admin' ? 'Administrator' : 'Kasir'}.`, 'success');
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('mega_teknik_auth');
+    localStorage.removeItem('mega_teknik_auth');
+    setCurrentUser(null);
+    setCurrentUserState(null);
+    setIsAuthenticated(false);
+    setCurrentTab('kasir');
+  };
+
+  const handleSelectTab = (tab: NavTab) => {
+    if (tab === 'settings' && currentUser?.role === 'kasir') {
+      showToast('Akses ditolak: Menu Pengaturan hanya untuk Administrator.', 'info');
+      return;
+    }
+    setCurrentTab(tab);
   };
 
   const handleProductUpdated = () => {
@@ -62,36 +112,54 @@ export const App: React.FC = () => {
     setStoreProfile(newProfile);
   };
 
-  // Centralized Print Receipt Handler
   const handlePrintReceipt = (trx: Transaction) => {
     setPrintTransaction(trx);
-    // Short timeout to guarantee DOM update with transaction data before opening print preview
     setTimeout(() => {
       window.print();
     }, 100);
   };
 
+  const handlePreviewSplash = () => {
+    setIsSplashPreview(true);
+    setShowSplash(true);
+  };
+
+  if (!isAuthenticated) {
+    return <LoginView onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  const isAdmin = currentUser?.role === 'admin';
+
   return (
     <>
-      {/* Global Thermal Receipt - Only visible when printing (@media print) */}
+      {showSplash && (
+        <SplashScreen
+          minDuration={isSplashPreview ? 2200 : 1800}
+          isPreview={isSplashPreview}
+          onFinish={() => {
+            setShowSplash(false);
+            setIsSplashPreview(false);
+          }}
+        />
+      )}
+
       <ThermalReceipt
         transaction={printTransaction}
         storeProfile={storeProfile}
       />
 
-      {/* Main Interactive App Container - Hidden when printing */}
       <div className="app-container no-print">
         <OfflineBanner />
 
-        {/* Navigation Header */}
         <Navbar
           currentTab={currentTab}
-          onSelectTab={setCurrentTab}
+          onSelectTab={handleSelectTab}
           productCount={products.length}
           storeProfile={storeProfile}
+          currentUser={currentUser}
+          onLogout={handleLogout}
         />
 
-        {/* Main Dynamic View */}
         <main className="main-content">
           {currentTab === 'kasir' && (
             <KasirView
@@ -121,17 +189,17 @@ export const App: React.FC = () => {
             />
           )}
 
-          {currentTab === 'settings' && (
+          {currentTab === 'settings' && isAdmin && (
             <SettingsView
               storeProfile={storeProfile}
               onUpdateProfile={handleProfileUpdated}
               showToast={showToast}
               onDataReset={loadData}
+              onPreviewSplash={handlePreviewSplash}
             />
           )}
         </main>
 
-        {/* Floating Toast Alerts */}
         <div className="toast-container">
           {toasts.map((toast) => (
             <div key={toast.id} className={`toast ${toast.type}`}>
@@ -145,7 +213,6 @@ export const App: React.FC = () => {
           ))}
         </div>
 
-        {/* PWA Install Banner */}
         <InstallBanner />
       </div>
     </>

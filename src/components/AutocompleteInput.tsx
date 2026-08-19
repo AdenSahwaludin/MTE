@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Product } from '../types';
 import { searchProducts, SearchMatch } from '../services/storageService';
 import { formatRupiah } from '../utils/formatters';
-import { Search, Tag, Sparkles } from 'lucide-react';
+import { Tag, Sparkles, X } from 'lucide-react';
 
 interface AutocompleteInputProps {
   value: string;
@@ -31,7 +31,7 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
     if (value.trim().length > 0) {
       const results = searchProducts(value);
       setMatches(results);
-      setIsOpen(true);
+      setIsOpen(results.length > 0);
       setSelectedIndex(-1);
     } else {
       setMatches([]);
@@ -39,7 +39,7 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
     }
   }, [value]);
 
-  // Click outside listener to close dropdown
+  // Click outside listener to close dropdown immediately
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -74,6 +74,9 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
     setIsOpen(false);
   };
 
+  const hasMatches = matches.length > 0;
+  const isNewItem = value.trim().length > 0 && !hasMatches;
+
   return (
     <div className="autocomplete-container" ref={containerRef}>
       <input
@@ -85,25 +88,50 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => {
           if (value.trim().length > 0) {
-            setMatches(searchProducts(value));
-            setIsOpen(true);
+            const results = searchProducts(value);
+            setMatches(results);
+            setIsOpen(results.length > 0);
           }
+        }}
+        onBlur={() => {
+          // Delay to allow item click or button tap before hiding
+          setTimeout(() => {
+            setIsOpen(false);
+          }, 180);
         }}
         onKeyDown={handleKeyDown}
         autoFocus={autoFocus}
         autoComplete="off"
       />
 
-      {isOpen && value.trim().length > 0 && (
-        <ul className="autocomplete-dropdown">
-          {matches.length > 0 ? (
-            matches.map((item, index) => {
+      {/* Floating Dropdown ONLY when there are actual matching products */}
+      {isOpen && hasMatches && (
+        <div className="autocomplete-dropdown-wrapper">
+          <div className="autocomplete-dropdown-header">
+            <span>Saran Produk ({matches.length})</span>
+            <button
+              type="button"
+              className="autocomplete-close-btn"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsOpen(false);
+              }}
+              title="Tutup saran"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <ul className="autocomplete-dropdown">
+            {matches.map((item, index) => {
               const isSelected = index === selectedIndex;
               return (
                 <li
                   key={item.product.id}
                   className={`autocomplete-item ${isSelected ? 'selected' : ''}`}
-                  onClick={() => handleSelect(item.product)}
+                  onMouseDown={(e) => {
+                    e.preventDefault(); // Prevents blur before select triggers
+                    handleSelect(item.product);
+                  }}
                 >
                   <div className="item-left">
                     <div className="item-name">{item.product.name}</div>
@@ -132,16 +160,19 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
                   </div>
                 </li>
               );
-            })
-          ) : (
-            <div className="autocomplete-empty-hint">
-              <Sparkles size={14} color="#f59e0b" />
-              <span>
-                Barang belum terdaftar. Menambahkan ini akan <strong>otomatis menyimpannya</strong> ke Master Produk.
-              </span>
-            </div>
-          )}
-        </ul>
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* Non-overlapping Inline Helper Badge when typing a brand new item */}
+      {isNewItem && (
+        <div className="autocomplete-inline-hint">
+          <Sparkles size={13} color="#d97706" style={{ flexShrink: 0 }} />
+          <span>
+            Barang belum terdaftar. Menambahkan ini akan <strong>otomatis menyimpannya</strong> ke Master Produk.
+          </span>
+        </div>
       )}
     </div>
   );

@@ -26,6 +26,8 @@ import {
   Share2,
   Zap,
   Bluetooth,
+  Save,
+  Check,
 } from 'lucide-react';
 
 interface KasirViewProps {
@@ -66,12 +68,15 @@ export const KasirView: React.FC<KasirViewProps> = ({
     nameInputRef.current?.focus();
   }, []);
 
-  // Keyboard shortcut handlers (F2 = Print, F4 = Reset)
+  // Keyboard shortcut handlers (F2 = Print, F3 = Save without Print, F4 = Reset)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
         e.preventDefault();
         handlePrintReceipt();
+      } else if (e.key === 'F3') {
+        e.preventDefault();
+        handleSaveOnlyTransaction();
       } else if (e.key === 'F4') {
         e.preventDefault();
         handleResetTransaction();
@@ -127,7 +132,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       finalProductId = saved.product.id;
       isNew = true;
       onProductUpdated();
-      showToast(`✨ Barang baru "${trimmedName}" otomatis tersimpan di Master Produk (Rp ${formatNumber(priceNum)})`, 'success');
+      showToast(`Barang baru "${trimmedName}" otomatis tersimpan di Master Produk (Rp ${formatNumber(priceNum)})`, 'success');
     }
 
     // Add to cart items
@@ -192,7 +197,56 @@ export const KasirView: React.FC<KasirViewProps> = ({
     setCartItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Quick cash buttons
+  const smartCashSuggestions = React.useMemo(() => {
+    if (totalAmount <= 0) return [];
+    const list: number[] = [totalAmount];
+    const candidates = new Set<number>();
+
+    if (totalAmount < 10000) {
+      candidates.add(Math.ceil(totalAmount / 2000) * 2000);
+      candidates.add(Math.ceil(totalAmount / 5000) * 5000);
+      candidates.add(10000);
+      candidates.add(20000);
+      candidates.add(50000);
+      candidates.add(100000);
+    } else if (totalAmount < 20000) {
+      candidates.add(20000);
+      candidates.add(50000);
+      candidates.add(100000);
+    } else if (totalAmount < 50000) {
+      candidates.add(Math.ceil(totalAmount / 10000) * 10000);
+      candidates.add(50000);
+      candidates.add(100000);
+    } else if (totalAmount < 100000) {
+      candidates.add(Math.ceil(totalAmount / 10000) * 10000);
+      candidates.add(Math.ceil(totalAmount / 50000) * 50000);
+      candidates.add(100000);
+      candidates.add(150000);
+      candidates.add(200000);
+    } else {
+      candidates.add(Math.ceil(totalAmount / 10000) * 10000);
+      candidates.add(Math.ceil(totalAmount / 50000) * 50000);
+      candidates.add(Math.ceil(totalAmount / 100000) * 100000);
+      candidates.add(Math.ceil(totalAmount / 100000) * 100000 + 100000);
+      candidates.add(Math.ceil(totalAmount / 100000) * 100000 + 200000);
+      candidates.add(Math.ceil(totalAmount / 500000) * 500000);
+    }
+
+    const sorted = Array.from(candidates)
+      .filter((amount) => amount > totalAmount)
+      .sort((a, b) => a - b);
+
+    for (const val of sorted) {
+      if (list.length < 5) {
+        list.push(val);
+      }
+    }
+
+    return list;
+  }, [totalAmount]);
+
+  const isInsufficientCash = numericCash > 0 && numericCash < totalAmount;
+
   const setExactCash = () => {
     setCashAmount(totalAmount.toString());
   };
@@ -201,7 +255,6 @@ export const KasirView: React.FC<KasirViewProps> = ({
     setCashAmount(amount.toString());
   };
 
-  // Reset transaction
   const handleResetTransaction = () => {
     setCartItems([]);
     setItemName('');
@@ -215,11 +268,15 @@ export const KasirView: React.FC<KasirViewProps> = ({
     nameInputRef.current?.focus();
   };
 
-  // Helper to build and persist transaction before printing
   const createCurrentTransaction = (): Transaction | null => {
     if (cartItems.length === 0) {
       showToast('Keranjang masih kosong, tambahkan barang terlebih dahulu', 'info');
       nameInputRef.current?.focus();
+      return null;
+    }
+
+    if (numericCash > 0 && numericCash < totalAmount) {
+      showToast(`Uang diterima (${formatRupiah(numericCash)}) kurang dari total tagihan (${formatRupiah(totalAmount)})`, 'info');
       return null;
     }
 
@@ -239,7 +296,6 @@ export const KasirView: React.FC<KasirViewProps> = ({
       notes: notes.trim() || undefined,
     };
 
-    // Save transaction to local storage
     saveTransaction(transactionData);
     if (onTransactionCreated) {
       onTransactionCreated();
@@ -248,7 +304,16 @@ export const KasirView: React.FC<KasirViewProps> = ({
     return transactionData;
   };
 
-  // 1. Direct Web Bluetooth Print (Android Chrome / PC Web Bluetooth - No 3rd party app needed!)
+  // 1. Save Transaction ONLY (No Printing dialog triggered)
+  const handleSaveOnlyTransaction = () => {
+    const trx = createCurrentTransaction();
+    if (!trx) return;
+
+    showToast(`Transaksi ${trx.invoiceNo} berhasil disimpan ke database!`, 'success');
+    handleResetTransaction();
+  };
+
+  // 2. Direct Web Bluetooth Print (Android Chrome / PC Web Bluetooth - No 3rd party app needed!)
   const [isPrintingBt, setIsPrintingBt] = useState(false);
 
   const handlePrintBluetooth = async () => {
@@ -257,9 +322,9 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
     try {
       setIsPrintingBt(true);
-      showToast('🔍 Menghubungkan ke printer Bluetooth (VSC MP-58M Pro)...', 'info');
+      showToast('Menghubungkan ke printer Bluetooth (VSC MP-58M Pro)...', 'info');
       await printDirectBluetooth(trx, storeProfile);
-      showToast('✅ Struk berhasil dicetak ke printer Bluetooth!', 'success');
+      showToast('Struk berhasil dicetak ke printer Bluetooth!', 'success');
       handleResetTransaction();
     } catch (err: any) {
       console.error('Bluetooth print error:', err);
@@ -269,7 +334,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     }
   };
 
-  // 2. Standard Browser Print (PC / Desktop / USB)
+  // 3. Standard Browser Print (PC / Desktop / USB)
   const handlePrintReceipt = () => {
     const trx = createCurrentTransaction();
     if (!trx) return;
@@ -279,22 +344,22 @@ export const KasirView: React.FC<KasirViewProps> = ({
     handleResetTransaction();
   };
 
-  // 3. Direct RawBT Print (Android Companion App)
+  // 4. Direct RawBT Print (Android Companion App)
   const handlePrintRawBT = () => {
     const trx = createCurrentTransaction();
     if (!trx) return;
 
-    showToast('⚡ Mengirim data ke RawBT Android (POS-58)...', 'success');
+    showToast('Mengirim data ke RawBT Android (POS-58)...', 'success');
     printViaRawBT(trx, storeProfile);
     handleResetTransaction();
   };
 
-  // 4. Direct Thermer Print (iOS Companion App)
+  // 5. Direct Thermer Print (iOS Companion App)
   const handlePrintThermer = () => {
     const trx = createCurrentTransaction();
     if (!trx) return;
 
-    showToast('🍎 Membuka aplikasi Thermer iOS (POS-58)...', 'success');
+    showToast('Membuka aplikasi Thermer iOS (POS-58)...', 'success');
     printViaThermer(trx, storeProfile);
     handleResetTransaction();
   };
@@ -309,8 +374,8 @@ export const KasirView: React.FC<KasirViewProps> = ({
             <h2>
               <ShoppingCart size={20} color="#2563eb" /> Kasir & Generate Struk
             </h2>
-            <div className="shortcut-tip">
-              <Keyboard size={14} /> Tekan <kbd>Enter</kbd> untuk tambah item | <kbd>F2</kbd> Cetak Struk
+            <div className="shortcut-tip hide-on-mobile">
+              <Keyboard size={14} /> <kbd>Enter</kbd> tambah item | <kbd>F3</kbd> Simpan Saja | <kbd>F2</kbd> Cetak Struk
             </div>
           </div>
 
@@ -334,63 +399,65 @@ export const KasirView: React.FC<KasirViewProps> = ({
               />
             </div>
 
-            {/* Harga Barang */}
-            <div className="form-group">
-              <label>Harga Satuan</label>
-              <div className="price-input-wrapper">
-                <span className="currency-prefix">Rp</span>
-                <input
-                  ref={priceInputRef}
-                  type="text"
-                  className="form-input"
-                  placeholder="0"
-                  value={itemPrice ? formatNumber(itemPrice) : ''}
-                  onChange={(e) => {
-                    const raw = parseNumberFromInput(e.target.value);
-                    setItemPrice(raw > 0 ? raw.toString() : '');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddItem();
-                    }
-                  }}
-                />
+            <div className="price-qty-grid">
+              {/* Harga Barang */}
+              <div className="form-group">
+                <label>Harga Satuan</label>
+                <div className="price-input-wrapper">
+                  <span className="currency-prefix">Rp</span>
+                  <input
+                    ref={priceInputRef}
+                    type="text"
+                    className="form-input"
+                    placeholder="0"
+                    value={itemPrice ? formatNumber(itemPrice) : ''}
+                    onChange={(e) => {
+                      const raw = parseNumberFromInput(e.target.value);
+                      setItemPrice(raw > 0 ? raw.toString() : '');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddItem();
+                      }
+                    }}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Qty */}
-            <div className="form-group">
-              <label>Qty</label>
-              <div className="qty-input-wrapper">
-                <button
-                  type="button"
-                  className="qty-btn"
-                  onClick={() => setItemQty((q) => Math.max(1, q - 1))}
-                >
-                  -
-                </button>
-                <input
-                  ref={qtyInputRef}
-                  type="number"
-                  min="1"
-                  className="form-input"
-                  value={itemQty}
-                  onChange={(e) => setItemQty(Math.max(1, parseInt(e.target.value) || 1))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddItem();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="qty-btn"
-                  onClick={() => setItemQty((q) => q + 1)}
-                >
-                  +
-                </button>
+              {/* Qty */}
+              <div className="form-group">
+                <label>Qty</label>
+                <div className="qty-input-wrapper">
+                  <button
+                    type="button"
+                    className="qty-btn"
+                    onClick={() => setItemQty((q) => Math.max(1, q - 1))}
+                  >
+                    -
+                  </button>
+                  <input
+                    ref={qtyInputRef}
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={itemQty}
+                    onChange={(e) => setItemQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddItem();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="qty-btn"
+                    onClick={() => setItemQty((q) => q + 1)}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -522,49 +589,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
             </label>
 
             <div className="quick-cash-row">
-              <button
-                type="button"
-                className={`btn-quick-cash ${numericCash === totalAmount && totalAmount > 0 ? 'active' : ''}`}
-                onClick={setExactCash}
-                disabled={totalAmount === 0}
-              >
-                Uang Pas ({formatRupiah(totalAmount)})
-              </button>
-              <button
-                type="button"
-                className={`btn-quick-cash ${numericCash === 10000 ? 'active' : ''}`}
-                onClick={() => addQuickCash(10000)}
-              >
-                Rp 10.000
-              </button>
-              <button
-                type="button"
-                className={`btn-quick-cash ${numericCash === 20000 ? 'active' : ''}`}
-                onClick={() => addQuickCash(20000)}
-              >
-                Rp 20.000
-              </button>
-              <button
-                type="button"
-                className={`btn-quick-cash ${numericCash === 50000 ? 'active' : ''}`}
-                onClick={() => addQuickCash(50000)}
-              >
-                Rp 50.000
-              </button>
-              <button
-                type="button"
-                className={`btn-quick-cash ${numericCash === 100000 ? 'active' : ''}`}
-                onClick={() => addQuickCash(100000)}
-              >
-                Rp 100.000
-              </button>
-              <button
-                type="button"
-                className={`btn-quick-cash ${numericCash === 200000 ? 'active' : ''}`}
-                onClick={() => addQuickCash(200000)}
-              >
-                Rp 200.000
-              </button>
+              {smartCashSuggestions.map((amount, idx) => (
+                <button
+                  key={amount}
+                  type="button"
+                  className={`btn-quick-cash ${numericCash === amount ? 'active' : ''}`}
+                  onClick={() => addQuickCash(amount)}
+                  disabled={totalAmount === 0}
+                >
+                  {idx === 0 ? `Uang Pas (${formatRupiah(amount)})` : formatRupiah(amount)}
+                </button>
+              ))}
             </div>
 
             <div className="price-input-wrapper" style={{ marginTop: '0.25rem' }}>
@@ -580,6 +615,29 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 }}
               />
             </div>
+
+            {isInsufficientCash && (
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  color: '#b91c1c',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  marginTop: '2px',
+                }}
+              >
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>
+                  Uang bayar kurang {formatRupiah(totalAmount - numericCash)}. Nominal tidak boleh di bawah total tagihan.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Kembalian Display */}
@@ -624,12 +682,46 @@ export const KasirView: React.FC<KasirViewProps> = ({
             />
           </div>
 
-          {/* Direct Bluetooth Primary Action (Web Bluetooth ESC/POS - No apps needed) */}
+          {/* Action Buttons: Simpan Saja (F3), Cetak Browser (F2), Reset (F4) */}
+          <div className="action-buttons-grid">
+            <button
+              type="button"
+              className="btn-primary-save-only"
+              onClick={handleSaveOnlyTransaction}
+              disabled={cartItems.length === 0 || isInsufficientCash}
+              title="Simpan transaksi kasir langsung ke database tanpa mencetak struk (F3)"
+            >
+              <Save size={18} />
+              <span>Simpan Saja<span className="btn-shortcut-tag"> (F3)</span></span>
+            </button>
+
+            <button
+              type="button"
+              className="btn-primary-print"
+              onClick={handlePrintReceipt}
+              disabled={cartItems.length === 0 || isInsufficientCash}
+              title="Simpan dan cetak struk via dialog browser / PC / USB (F2)"
+            >
+              <Printer size={18} />
+              <span>Cetak Browser<span className="btn-shortcut-tag"> (F2)</span></span>
+            </button>
+
+            <button
+              type="button"
+              className="btn-secondary-reset"
+              onClick={handleResetTransaction}
+              title="Reset transaksi kasir (F4)"
+            >
+              <RotateCcw size={16} />
+              <span>Reset<span className="btn-shortcut-tag"> (F4)</span></span>
+            </button>
+          </div>
+
           <button
             type="button"
             className="btn-primary-bluetooth"
             onClick={handlePrintBluetooth}
-            disabled={cartItems.length === 0 || isPrintingBt}
+            disabled={cartItems.length === 0 || isPrintingBt || isInsufficientCash}
             title="Cetak langsung ke printer Bluetooth VSC MP-58M Pro via Web Bluetooth"
           >
             <Bluetooth size={20} className={isPrintingBt ? 'animate-spin' : ''} />
@@ -641,28 +733,6 @@ export const KasirView: React.FC<KasirViewProps> = ({
             </div>
           </button>
 
-          {/* Action Buttons: Reset & Browser Print */}
-          <div className="action-buttons-row">
-            <button
-              type="button"
-              className="btn-secondary-reset"
-              onClick={handleResetTransaction}
-              title="Reset transaksi kasir (F4)"
-            >
-              <RotateCcw size={16} /> Reset (F4)
-            </button>
-            <button
-              type="button"
-              className="btn-primary-print"
-              onClick={handlePrintReceipt}
-              disabled={cartItems.length === 0}
-              title="Cetak via dialog browser / PC / USB (F2)"
-            >
-              <Printer size={18} /> Cetak Browser (F2)
-            </button>
-          </div>
-
-          {/* Alternative Mobile Companion Apps (RawBT & Thermer) */}
           <div className="direct-print-wrapper">
             <div className="direct-print-header">
               <Zap size={13} color="#f59e0b" />
@@ -673,7 +743,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 type="button"
                 className="btn-direct-rawbt"
                 onClick={handlePrintRawBT}
-                disabled={cartItems.length === 0}
+                disabled={cartItems.length === 0 || isInsufficientCash}
                 title="Buka via aplikasi RawBT (Android)"
               >
                 <Smartphone size={16} />
@@ -686,7 +756,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 type="button"
                 className="btn-direct-thermer"
                 onClick={handlePrintThermer}
-                disabled={cartItems.length === 0}
+                disabled={cartItems.length === 0 || isInsufficientCash}
                 title="Buka via aplikasi Thermer (iOS / iPhone)"
               >
                 <Share2 size={16} />

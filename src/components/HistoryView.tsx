@@ -57,9 +57,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   const handleReprintBluetooth = async (t: Transaction) => {
     try {
       setIsPrintingBtId(t.id);
-      showToast(`🔍 Menghubungkan ke printer Bluetooth (${t.invoiceNo})...`, 'info');
+      showToast(`Menghubungkan ke printer Bluetooth (${t.invoiceNo})...`, 'info');
       await printDirectBluetooth(t, storeProfile);
-      showToast(`✅ Berhasil mencetak struk ${t.invoiceNo} ke printer Bluetooth!`, 'success');
+      showToast(`Berhasil mencetak struk ${t.invoiceNo} ke printer Bluetooth!`, 'success');
     } catch (err: any) {
       console.error('Bluetooth reprint error:', err);
       showToast(err?.message || 'Gagal koneksi Bluetooth. Pastikan Bluetooth aktif dan pilih printer.', 'info');
@@ -74,12 +74,12 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   };
 
   const handleReprintRawBT = (t: Transaction) => {
-    showToast(`⚡ Mengirim ulang ke RawBT Android (${t.invoiceNo})...`, 'success');
+    showToast(`Mengirim ulang ke RawBT Android (${t.invoiceNo})...`, 'success');
     printViaRawBT(t, storeProfile);
   };
 
   const handleReprintThermer = (t: Transaction) => {
-    showToast(`🍎 Membuka Thermer iOS (${t.invoiceNo})...`, 'success');
+    showToast(`Membuka Thermer iOS (${t.invoiceNo})...`, 'success');
     printViaThermer(t, storeProfile);
   };
 

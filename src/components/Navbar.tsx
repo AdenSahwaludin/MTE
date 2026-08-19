@@ -1,6 +1,7 @@
 import React from 'react';
-import { ShoppingCart, Package, History, Settings } from 'lucide-react';
-import { StoreProfile } from '../types';
+import { ShoppingCart, Package, History, Settings, LogOut, ShieldCheck, User } from 'lucide-react';
+import { StoreProfile, UserAccount } from '../types';
+import { SyncBadge } from './SyncBadge';
 
 export type NavTab = 'kasir' | 'products' | 'history' | 'settings';
 
@@ -9,6 +10,8 @@ interface NavbarProps {
   onSelectTab: (tab: NavTab) => void;
   productCount: number;
   storeProfile: StoreProfile;
+  currentUser: UserAccount | null;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -16,22 +19,25 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectTab,
   productCount,
   storeProfile,
+  currentUser,
+  onLogout,
 }) => {
+  const isAdmin = currentUser?.role === 'admin';
+
   return (
     <>
-      {/* Top Navbar */}
       <header className="navbar no-print">
         <div className="brand-section">
           <div className="brand-icon">
             <img className="brand-logo-img" src="/logo.webp" alt="Logo Mega Tehnik Elektronik" />
           </div>
           <div className="brand-info">
-            <h1>{storeProfile.name}</h1>
-            <span>POS Thermal 58mm</span>
+            <h1 className="brand-title">{storeProfile.name || 'Mega Tehnik Elektronik'}</h1>
+            <span className="brand-tagline">{storeProfile.tagline || 'Solusi Elektronik, Terpercaya!'}</span>
           </div>
         </div>
 
-        {/* Desktop Navigation Links */}
+        {/* Desktop Navigation Links (Visible on Laptop/PC >= 1024px) */}
         <nav className="nav-links-desktop">
           <button
             type="button"
@@ -61,18 +67,52 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Riwayat Struk</span>
           </button>
 
-          <button
-            type="button"
-            className={`nav-btn ${currentTab === 'settings' ? 'active' : ''}`}
-            onClick={() => onSelectTab('settings')}
-          >
-            <Settings size={18} />
-            <span>Pengaturan</span>
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              className={`nav-btn ${currentTab === 'settings' ? 'active' : ''}`}
+              onClick={() => onSelectTab('settings')}
+            >
+              <Settings size={18} />
+              <span>Pengaturan</span>
+            </button>
+          )}
         </nav>
+
+        {/* Right Section: User Badge, Sync Status, and Logout */}
+        <div className="navbar-right-section">
+          {currentUser && (
+            <div
+              className={`user-badge-pill ${isAdmin ? 'admin' : 'kasir'}`}
+              title={`Masuk sebagai ${currentUser.name} (${currentUser.role})`}
+            >
+              {isAdmin ? <ShieldCheck size={14} color="#60a5fa" /> : <User size={14} color="#34d399" />}
+              <span className="user-badge-name-full">
+                {isAdmin ? 'Admin' : 'Kasir'}: {currentUser.name || currentUser.username}
+              </span>
+              <span className="user-badge-name-compact">
+                {currentUser.name ? currentUser.name.split(' ')[0] : currentUser.username}
+              </span>
+            </div>
+          )}
+
+          <SyncBadge />
+
+          {onLogout && (
+            <button
+              type="button"
+              className="btn-logout"
+              onClick={onLogout}
+              title="Keluar / Logout dari Akun"
+            >
+              <LogOut size={16} />
+              <span className="logout-label">Keluar</span>
+            </button>
+          )}
+        </div>
       </header>
 
-      {/* Mobile Bottom Navigation Bar (Thumb Friendly) */}
+      {/* Bottom Nav for Mobile & Tablets / iPad (< 1024px) */}
       <div className="mobile-bottom-nav no-print">
         <button
           type="button"
@@ -102,14 +142,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span>Riwayat</span>
         </button>
 
-        <button
-          type="button"
-          className={`mobile-nav-item ${currentTab === 'settings' ? 'active' : ''}`}
-          onClick={() => onSelectTab('settings')}
-        >
-          <Settings size={20} />
-          <span>Setting</span>
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            className={`mobile-nav-item ${currentTab === 'settings' ? 'active' : ''}`}
+            onClick={() => onSelectTab('settings')}
+          >
+            <Settings size={20} />
+            <span>Setting</span>
+          </button>
+        )}
       </div>
     </>
   );

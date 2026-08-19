@@ -1,18 +1,25 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [
-    react(),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
+    define: {
+      'process.env.TURSO_DATABASE_URL': JSON.stringify(env.DATABASE_URL || env.VITE_TURSO_DATABASE_URL || ''),
+      'process.env.TURSO_AUTH_TOKEN': JSON.stringify(env.TOKEN_TURSO || env.VITE_TURSO_AUTH_TOKEN || ''),
+      'import.meta.env.VITE_TURSO_DATABASE_URL': JSON.stringify(env.DATABASE_URL || env.VITE_TURSO_DATABASE_URL || ''),
+      'import.meta.env.VITE_TURSO_AUTH_TOKEN': JSON.stringify(env.TOKEN_TURSO || env.VITE_TURSO_AUTH_TOKEN || ''),
+    },
+    plugins: [
+      react(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [
         'favicon.svg',
-        'icons.svg',
+        'favicon.png',
         'logo.webp',
-        'logo-mega-tehnik.webp',
         'pwa/icon-192.png',
         'pwa/icon-512.png',
         'pwa/icon-maskable-512.png',
@@ -23,15 +30,15 @@ export default defineConfig({
         name: 'Mega Tehnik Elektronik - Kasir & Cetak Struk Thermal',
         short_name: 'Mega Tehnik',
         description:
-          'Mega Tehnik Elektronik - Program Kasir, Manajemen Produk & Cetak Struk Thermal 58mm/80mm',
+          'Mega Tehnik Elektronik - Solusi Elektronik, Terpercaya! Kasir, Manajemen Produk & Cetak Struk Thermal',
         lang: 'id',
         dir: 'ltr',
         start_url: '/',
         scope: '/',
         display: 'standalone',
         display_override: ['standalone', 'minimal-ui'],
-        background_color: '#0f172a',
-        theme_color: '#2563eb',
+        background_color: '#060a17',
+        theme_color: '#0D47A1',
         orientation: 'any',
         categories: ['business', 'shopping', 'productivity'],
         icons: [
@@ -80,4 +87,5 @@ export default defineConfig({
     port: 3000,
     open: true,
   },
+  };
 });

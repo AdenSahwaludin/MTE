@@ -1,10 +1,10 @@
 export interface Product {
   id: string;
   name: string;
-  aliases: string[]; // Nama lain / sinonim / sebutan lain produk
+  aliases: string[];
   price: number;
   category?: string;
-  unit?: string; // pcs, meter, rol, set, dus, batang, pak, dll
+  unit?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,7 +23,7 @@ export interface CartItem {
 export interface Transaction {
   id: string;
   invoiceNo: string;
-  date: string; // ISO string
+  date: string;
   items: CartItem[];
   totalAmount: number;
   cashAmount: number;
@@ -45,4 +45,15 @@ export interface StoreProfile {
   cashierName: string;
   autoSaveProducts: boolean;
   currency: string;
+}
+
+export type UserRole = 'admin' | 'kasir';
+
+export interface UserAccount {
+  id: string;
+  username: string;
+  password: string;
+  name: string;
+  role: UserRole;
+  createdAt?: string;
 }

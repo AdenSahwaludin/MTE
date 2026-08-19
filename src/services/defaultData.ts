@@ -1,10 +1,10 @@
-import { Product, StoreProfile } from '../types';
+import { Product, StoreProfile, UserAccount } from '../types';
 
 export const DEFAULT_STORE_PROFILE: StoreProfile = {
   name: 'Mega Tehnik Elektronik',
-  tagline: 'Solusi Alat Teknik & Bahan Bangunan',
-  address: 'Jl. Raya Teknik No. 88, Pertokoan Mega Niaga',
-  phone: '0812-3456-7890 / 0878-1122-3344',
+  tagline: 'Solusi Elektronik, Terpercaya!',
+  address: 'Blok Gebangmampang, Desa Margamulya, Kec. Bongas',
+  phone: '0852-2429-7545',
   footerNote: 'Barang yang sudah dibeli tidak dapat ditukar/dikembalikan kecuali ada perjanjian.',
   paperSize: '58mm',
   showDateTime: true,
@@ -13,6 +13,25 @@ export const DEFAULT_STORE_PROFILE: StoreProfile = {
   autoSaveProducts: true,
   currency: 'Rp',
 };
+
+export const DEFAULT_USERS: UserAccount[] = [
+  {
+    id: 'user-admin',
+    username: 'admin',
+    password: 'admin123',
+    name: 'Administrator',
+    role: 'admin',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'user-kasir',
+    username: 'kasir',
+    password: 'kasir123',
+    name: 'Kasir 01',
+    role: 'kasir',
+    createdAt: new Date().toISOString(),
+  },
+];
 
 export const INITIAL_SAMPLE_PRODUCTS: Product[] = [
   {

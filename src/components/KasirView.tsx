@@ -635,9 +635,9 @@ export const KasirView: React.FC<KasirViewProps> = ({
             <Bluetooth size={20} className={isPrintingBt ? 'animate-spin' : ''} />
             <div className="btn-bt-content">
               <span className="btn-bt-title">
-                {isPrintingBt ? 'Menghubungkan Bluetooth...' : 'Cetak Bluetooth (VSC MP-58M)'}
+                {isPrintingBt ? 'Menghubungkan Bluetooth...' : 'Cetak Bluetooth (Android / PC)'}
               </span>
-              <span className="btn-bt-subtitle">Direct ESC/POS Wireless • Android / PC</span>
+              <span className="btn-bt-subtitle">Google Chrome (Android & PC Desktop) • VSC MP-58M</span>
             </div>
           </button>
 

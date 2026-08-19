@@ -1699,6 +1699,31 @@ body {
   font-weight: 500;
 }
 
+.btn-history-bluetooth {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #0369a1;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-history-bluetooth:hover {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+}
+
+.btn-history-bluetooth:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* History view mini action buttons */
 .btn-history-rawbt {
   display: inline-flex;

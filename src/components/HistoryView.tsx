@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Transaction, StoreProfile } from '../types';
 import { deleteTransaction } from '../services/storageService';
 import { printViaRawBT, printViaThermer } from '../services/directPrintService';
+import { printDirectBluetooth } from '../services/bluetoothPrintService';
 import { formatRupiah, formatDateIndo } from '../utils/formatters';
 import {
   History,
@@ -15,6 +16,7 @@ import {
   ChevronUp,
   Smartphone,
   Share2,
+  Bluetooth,
 } from 'lucide-react';
 
 interface HistoryViewProps {
@@ -34,6 +36,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isPrintingBtId, setIsPrintingBtId] = useState<string | null>(null);
 
   // Filter transactions
   const filtered = transactions.filter((t) => {
@@ -50,6 +53,20 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayTransactions = transactions.filter((t) => t.date.startsWith(todayStr));
   const todayOmset = todayTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
+
+  const handleReprintBluetooth = async (t: Transaction) => {
+    try {
+      setIsPrintingBtId(t.id);
+      showToast(`🔍 Menghubungkan ke printer Bluetooth (${t.invoiceNo})...`, 'info');
+      await printDirectBluetooth(t, storeProfile);
+      showToast(`✅ Berhasil mencetak struk ${t.invoiceNo} ke printer Bluetooth!`, 'success');
+    } catch (err: any) {
+      console.error('Bluetooth reprint error:', err);
+      showToast(err?.message || 'Gagal koneksi Bluetooth. Pastikan Bluetooth aktif dan pilih printer.', 'info');
+    } finally {
+      setIsPrintingBtId(null);
+    }
+  };
 
   const handleReprint = (t: Transaction) => {
     showToast(`Mencetak ulang struk ${t.invoiceNo}...`, 'info');
@@ -201,9 +218,19 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                             <button
                               type="button"
                               className="btn-icon-action"
+                              style={{ color: '#0284c7', borderColor: '#bae6fd' }}
+                              onClick={() => handleReprintBluetooth(t)}
+                              disabled={isPrintingBtId === t.id}
+                              title="Cetak Langsung via Bluetooth (Android / PC)"
+                            >
+                              <Bluetooth size={15} className={isPrintingBtId === t.id ? 'animate-spin' : ''} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-icon-action"
                               style={{ color: '#059669', borderColor: '#a7f3d0' }}
                               onClick={() => handleReprint(t)}
-                              title="Cetak Ulang Struk"
+                              title="Cetak Ulang Struk (Browser)"
                             >
                               <Printer size={15} />
                             </button>
@@ -241,6 +268,15 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                               </ul>
                               <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReprintBluetooth(t)}
+                                    className="btn-history-bluetooth"
+                                    disabled={isPrintingBtId === t.id}
+                                    title="Cetak langsung via Bluetooth (Android Chrome / PC)"
+                                  >
+                                    <Bluetooth size={13} className={isPrintingBtId === t.id ? 'animate-spin' : ''} /> {isPrintingBtId === t.id ? 'Menghubungkan...' : 'Bluetooth (Android)'}
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => handleReprint(t)}

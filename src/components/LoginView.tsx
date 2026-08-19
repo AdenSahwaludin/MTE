@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, Loader2, Globe, AlertCircle } from 'lucide-react';
-import { getUsers, setCurrentUser } from '../services/storageService';
+import { getUsers, setCurrentUser, setInMemoryUsers } from '../services/storageService';
 import { fetchAllUsersFromTurso } from '../services/tursoClient';
 import { UserAccount } from '../types';
 
@@ -127,20 +127,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     setGeneralError('');
 
     try {
-      const users = getUsers();
-      let matched = users.find(
-        (u) => u.username.toLowerCase() === trimmedUsername && u.password === password
-      );
+      const trimmedPassword = password.trim();
 
-      if (!matched) {
-        // Try fetching fresh users from Turso directly
-        const freshUsers = await fetchAllUsersFromTurso();
+      // 1. Fetch fresh users directly from Turso
+      let freshUsers: UserAccount[] = [];
+      try {
+        freshUsers = await fetchAllUsersFromTurso();
         if (freshUsers.length > 0) {
-          matched = freshUsers.find(
-            (u) => u.username.toLowerCase() === trimmedUsername && u.password === password
-          );
+          setInMemoryUsers(freshUsers);
         }
+      } catch (err) {
+        console.warn('Direct Turso users fetch error:', err);
       }
+
+      // 2. Search against fresh users or in-memory fallback
+      const userPool = freshUsers.length > 0 ? freshUsers : getUsers();
+      const matched = userPool.find((u) => {
+        const uName = (u.username || '').trim().toLowerCase();
+        const uPass = (u.password || '').trim();
+        return uName === trimmedUsername && (uPass === trimmedPassword || u.password === password);
+      });
 
       if (matched) {
         sessionStorage.setItem('mega_teknik_auth', 'true');

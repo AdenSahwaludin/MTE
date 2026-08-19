@@ -68,7 +68,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const [usersList, setUsersList] = useState<UserAccount[]>(() => getUsers());
   const [showUserModal, setShowUserModal] = useState(false);
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<number | string | null>(null);
   const [userFormData, setUserFormData] = useState<{
     username: string;
     password: string;
@@ -238,7 +238,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleDeleteUserClick = (user: UserAccount) => {
-    if (loggedUser && loggedUser.id === user.id) {
+    if (loggedUser && String(loggedUser.id) === String(user.id)) {
       showToast('Tidak dapat menghapus akun Anda sendiri yang sedang aktif!', 'info');
       return;
     }

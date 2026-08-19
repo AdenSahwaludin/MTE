@@ -183,11 +183,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                           <div style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                             {t.invoiceNo}
                           </div>
-                          {t.customerName && (
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                              Plg: {t.customerName}
-                            </div>
-                          )}
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '3px', fontSize: '0.75rem' }}>
+                            {t.cashierName && (
+                              <span style={{ color: '#0369a1', background: '#f0f9ff', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bae6fd', fontWeight: 500 }}>
+                                Kasir: {t.cashierName}
+                              </span>
+                            )}
+                            {t.customerName && (
+                              <span style={{ color: '#64748b' }}>
+                                Plg: {t.customerName}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td style={{ fontSize: '0.85rem' }}>{formatDateIndo(t.date)}</td>
                         <td>

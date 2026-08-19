@@ -204,8 +204,13 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
                   <tr key={p.id}>
                     <td>
                       <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{p.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                        ID: {p.id}
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
+                        ID: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#64748b' }}>{p.id}</span>
+                        {p.createdBy && (
+                          <span style={{ marginLeft: '6px', color: '#0284c7', background: '#f0f9ff', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bae6fd' }}>
+                            Oleh: {p.createdBy}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td>

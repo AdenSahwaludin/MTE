@@ -55,7 +55,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Package size={18} />
             <span>Daftar Produk</span>
-            <span className="nav-badge">{productCount}</span>
           </button>
 
           <button
@@ -130,7 +129,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         >
           <Package size={20} />
           <span>Produk</span>
-          {productCount > 0 && <span className="mobile-nav-badge">{productCount}</span>}
         </button>
 
         <button

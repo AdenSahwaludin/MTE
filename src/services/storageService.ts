@@ -111,16 +111,63 @@ export const searchProducts = (query: string): SearchMatch[] => {
   });
 };
 
+export const generateNextProductId = (products: Product[] = inMemoryProducts): string => {
+  let maxNumber = 0;
+  for (const p of products) {
+    if (!p.id) continue;
+    const match = p.id.match(/^PRD-(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNumber) {
+        maxNumber = num;
+      }
+    }
+  }
+
+  // If no PRD- format found, check length of existing products
+  if (maxNumber === 0 && products.length > 0) {
+    maxNumber = products.length;
+  }
+
+  const nextNum = maxNumber + 1;
+  return `PRD-${String(nextNum).padStart(6, '0')}`;
+};
+
+export const getUniqueUnits = (products: Product[] = inMemoryProducts): string[] => {
+  const defaults = ['Pcs', 'Meter', 'Batang', 'Rol', 'Set', 'Dus', 'Zak', 'Kg', 'Liter', 'Tube', 'Lembar'];
+  const set = new Set<string>(defaults);
+  products.forEach((p) => {
+    if (p.unit && p.unit.trim()) {
+      set.add(p.unit.trim());
+    }
+  });
+  return Array.from(set);
+};
+
+export const getUniqueCategories = (products: Product[] = inMemoryProducts): string[] => {
+  const defaults = ['Umum', 'Kelistrikan', 'Perkakas', 'Plumbing', 'Bahan Bangunan', 'AC', 'Baut & Mur', 'Alat Ukur'];
+  const set = new Set<string>(defaults);
+  products.forEach((p) => {
+    if (p.category && p.category.trim()) {
+      set.add(p.category.trim());
+    }
+  });
+  return Array.from(set);
+};
+
 export const addOrUpdateProduct = (
   name: string,
   price: number,
   aliases: string[] = [],
   unit: string = 'Pcs',
   category: string = 'Umum',
-  id?: string
+  id?: string,
+  createdBy?: string
 ): { product: Product; isNew: boolean } => {
   const products = [...inMemoryProducts];
   const now = new Date().toISOString();
+  const activeUser = getCurrentUser();
+  const creatorName = createdBy || activeUser?.name || 'Administrator';
 
   if (id) {
     const index = products.findIndex((p) => p.id === id);
@@ -164,13 +211,15 @@ export const addOrUpdateProduct = (
     return { product: updatedProduct, isNew: false };
   }
 
+  const newId = generateNextProductId(products);
   const newProduct: Product = {
-    id: 'prod-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+    id: newId,
     name: name.trim(),
     aliases: aliases.map((a) => a.trim()).filter(Boolean),
     price,
     unit: unit.trim() || 'Pcs',
     category: category.trim() || 'Umum',
+    createdBy: creatorName,
     createdAt: now,
     updatedAt: now,
   };
@@ -197,8 +246,13 @@ export const saveTransactionsListDirect = (transactions: Transaction[]): void =>
 };
 
 export const saveTransaction = (transaction: Transaction): void => {
-  inMemoryTransactions = [transaction, ...inMemoryTransactions];
-  syncService.enqueue('INSERT_TRANSACTION', transaction);
+  const activeUser = getCurrentUser();
+  const txWithCashier: Transaction = {
+    ...transaction,
+    cashierName: transaction.cashierName || activeUser?.name || 'Kasir',
+  };
+  inMemoryTransactions = [txWithCashier, ...inMemoryTransactions];
+  syncService.enqueue('INSERT_TRANSACTION', txWithCashier);
 };
 
 export const deleteTransaction = (id: string): void => {
@@ -241,13 +295,13 @@ export const saveUsers = (users: UserAccount[]): void => {
 
 export const addOrUpdateUser = (
   userData: { username: string; password?: string; name: string; role: 'admin' | 'kasir' },
-  id?: string
+  id?: number | string
 ): UserAccount => {
   const users = [...inMemoryUsers];
   const now = new Date().toISOString();
 
-  if (id) {
-    const idx = users.findIndex((u) => u.id === id);
+  if (id !== undefined && id !== null && id !== '') {
+    const idx = users.findIndex((u) => String(u.id) === String(id));
     if (idx !== -1) {
       const existing = users[idx];
       const updated: UserAccount = {
@@ -256,6 +310,7 @@ export const addOrUpdateUser = (
         name: userData.name.trim(),
         role: userData.role,
         password: userData.password ? userData.password.trim() : existing.password,
+        updatedAt: now,
       };
       users[idx] = updated;
       inMemoryUsers = users;
@@ -275,6 +330,7 @@ export const addOrUpdateUser = (
       name: userData.name.trim(),
       role: userData.role,
       password: userData.password ? userData.password.trim() : existing.password,
+      updatedAt: now,
     };
     users[existingIdx] = updated;
     inMemoryUsers = users;
@@ -282,13 +338,21 @@ export const addOrUpdateUser = (
     return updated;
   }
 
+  // Calculate next integer auto-increment ID
+  const maxIntId = users.reduce((max, u) => {
+    const n = Number(u.id);
+    return !isNaN(n) && n > max ? n : max;
+  }, 0);
+  const nextId = maxIntId > 0 ? maxIntId + 1 : (users.length + 1);
+
   const newUser: UserAccount = {
-    id: 'user-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+    id: nextId,
     username: userData.username.trim().toLowerCase(),
     password: (userData.password || '123456').trim(),
     name: userData.name.trim(),
     role: userData.role,
     createdAt: now,
+    updatedAt: now,
   };
 
   users.push(newUser);
@@ -297,9 +361,9 @@ export const addOrUpdateUser = (
   return newUser;
 };
 
-export const deleteUser = (id: string): boolean => {
+export const deleteUser = (id: number | string): boolean => {
   const users = [...inMemoryUsers];
-  const target = users.find((u) => u.id === id);
+  const target = users.find((u) => String(u.id) === String(id));
   if (!target) return false;
 
   const admins = users.filter((u) => u.role === 'admin');
@@ -307,7 +371,7 @@ export const deleteUser = (id: string): boolean => {
     return false;
   }
 
-  inMemoryUsers = users.filter((u) => u.id !== id);
+  inMemoryUsers = users.filter((u) => String(u.id) !== String(id));
   syncService.enqueue('DELETE_USER', id);
   return true;
 };

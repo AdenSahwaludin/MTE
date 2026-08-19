@@ -5,10 +5,12 @@ import {
   addOrUpdateProduct,
   saveTransaction,
   generateInvoiceNumber,
+  getCurrentUser,
 } from '../services/storageService';
 import { printViaRawBT, printViaThermer } from '../services/directPrintService';
 import { printDirectBluetooth, isWebBluetoothSupported } from '../services/bluetoothPrintService';
 import { AutocompleteInput } from './AutocompleteInput';
+import { FormattedNumberInput } from './FormattedNumberInput';
 import { ReceiptPreview } from './ReceiptPreview';
 import { formatRupiah, formatNumber, parseNumberFromInput } from '../utils/formatters';
 import {
@@ -127,7 +129,16 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
     // Auto-save logic: if product not found in database, save it now!
     if (!matchedProd && storeProfile.autoSaveProducts) {
-      const saved = addOrUpdateProduct(trimmedName, priceNum, [], 'Pcs', 'Umum');
+      const activeUser = getCurrentUser();
+      const saved = addOrUpdateProduct(
+        trimmedName,
+        priceNum,
+        [],
+        'Pcs',
+        'Umum',
+        undefined,
+        activeUser?.name || 'Kasir'
+      );
       matchedProd = saved.product;
       finalProductId = saved.product.id;
       isNew = true;
@@ -282,6 +293,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
     const finalCash = numericCash > 0 ? numericCash : totalAmount;
     const finalChange = finalCash - totalAmount;
+    const activeUser = getCurrentUser();
 
     const transactionData: Transaction = {
       id: 'trx-' + Date.now(),
@@ -293,6 +305,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       changeAmount: Math.max(0, finalChange),
       paymentMethod: 'cash',
       customerName: customerName.trim() || undefined,
+      cashierName: activeUser?.name || storeProfile.cashierName || 'Kasir',
       notes: notes.trim() || undefined,
     };
 
@@ -405,16 +418,11 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 <label>Harga Satuan</label>
                 <div className="price-input-wrapper">
                   <span className="currency-prefix">Rp</span>
-                  <input
-                    ref={priceInputRef}
-                    type="text"
-                    className="form-input"
+                  <FormattedNumberInput
+                    inputRef={priceInputRef}
+                    value={itemPrice}
+                    onChange={(val) => setItemPrice(val)}
                     placeholder="0"
-                    value={itemPrice ? formatNumber(itemPrice) : ''}
-                    onChange={(e) => {
-                      const raw = parseNumberFromInput(e.target.value);
-                      setItemPrice(raw > 0 ? raw.toString() : '');
-                    }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -604,15 +612,11 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
             <div className="price-input-wrapper" style={{ marginTop: '0.25rem' }}>
               <span className="currency-prefix">Rp</span>
-              <input
-                type="text"
-                className="form-input"
+              <FormattedNumberInput
+                className={`form-input ${isInsufficientCash ? 'warning' : ''}`}
                 placeholder="Masukkan nominal uang bayar custom..."
-                value={cashAmount ? formatNumber(cashAmount) : ''}
-                onChange={(e) => {
-                  const raw = parseNumberFromInput(e.target.value);
-                  setCashAmount(raw > 0 ? raw.toString() : '');
-                }}
+                value={cashAmount}
+                onChange={(val) => setCashAmount(val)}
               />
             </div>
 
@@ -791,6 +795,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
           date={new Date().toISOString()}
           storeProfile={storeProfile}
           customerName={customerName}
+          cashierName={getCurrentUser()?.name || storeProfile.cashierName}
           notes={notes}
         />
       </div>

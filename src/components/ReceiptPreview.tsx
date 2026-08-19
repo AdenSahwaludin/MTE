@@ -12,6 +12,7 @@ interface ReceiptPreviewProps {
   date: string;
   storeProfile: StoreProfile;
   customerName?: string;
+  cashierName?: string;
   notes?: string;
 }
 
@@ -24,6 +25,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
   date,
   storeProfile,
   customerName,
+  cashierName,
   notes,
 }) => {
   return (
@@ -55,7 +57,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         </div>
         {storeProfile.showCashierName && (
           <div className="receipt-meta-row">
-            <span>Kasir: {storeProfile.cashierName}</span>
+            <span>Kasir: {cashierName || storeProfile.cashierName}</span>
             {customerName && <span>Plg: {customerName}</span>}
           </div>
         )}

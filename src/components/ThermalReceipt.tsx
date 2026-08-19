@@ -30,7 +30,7 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ transaction, sto
         </div>
         {storeProfile.showCashierName && (
           <div className="thermal-meta-row">
-            <span>Kasir: {storeProfile.cashierName}</span>
+            <span>Kasir: {transaction.cashierName || storeProfile.cashierName}</span>
             {transaction.customerName && <span>Plg: {transaction.customerName}</span>}
           </div>
         )}

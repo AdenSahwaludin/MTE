@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Product } from '../types';
-import { addOrUpdateProduct } from '../services/storageService';
-import { formatNumber, parseNumberFromInput } from '../utils/formatters';
-import { X, Plus, Tag } from 'lucide-react';
+import {
+  addOrUpdateProduct,
+  getUniqueUnits,
+  getUniqueCategories,
+} from '../services/storageService';
+import { FormattedNumberInput } from './FormattedNumberInput';
+import { X, Tag, ChevronDown } from 'lucide-react';
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -24,10 +28,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const [aliases, setAliases] = useState<string[]>([]);
   const [currentAliasInput, setCurrentAliasInput] = useState('');
 
+  // Fetch unique options currently present in database
+  const availableUnits = useMemo(() => getUniqueUnits(), [isOpen]);
+  const availableCategories = useMemo(() => getUniqueCategories(), [isOpen]);
+
   useEffect(() => {
     if (productToEdit) {
       setName(productToEdit.name);
-      setPrice(productToEdit.price.toString());
+      setPrice(productToEdit.price ? productToEdit.price.toString() : '');
       setUnit(productToEdit.unit || 'Pcs');
       setCategory(productToEdit.category || 'Umum');
       setAliases(productToEdit.aliases || []);
@@ -65,13 +73,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       finalAliases.push(currentAliasInput.trim());
     }
 
-    const priceNum = parseNumberFromInput(price);
+    const priceNum = price ? parseInt(price.replace(/\D/g, ''), 10) || 0 : 0;
     addOrUpdateProduct(
       name.trim(),
       priceNum,
       finalAliases,
-      unit.trim(),
-      category.trim(),
+      unit.trim() || 'Pcs',
+      category.trim() || 'Umum',
       productToEdit?.id
     );
 
@@ -84,12 +92,12 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       <div className="modal-container" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{productToEdit ? 'Edit Data Produk' : 'Tambah Produk Baru'}</h3>
-          <button className="modal-close-btn" onClick={onClose}>
+          <button className="modal-close-btn" onClick={onClose} title="Tutup">
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="modal-form-wrapper">
           <div className="modal-body">
             {/* Nama Produk Utama */}
             <div className="form-group">
@@ -153,20 +161,15 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             </div>
 
             {/* Harga & Satuan */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '0.75rem' }}>
               <div className="form-group">
                 <label>Harga Satuan (Rp) *</label>
                 <div className="price-input-wrapper">
                   <span className="currency-prefix">Rp</span>
-                  <input
-                    type="text"
-                    className="form-input"
+                  <FormattedNumberInput
+                    value={price}
+                    onChange={(val) => setPrice(val)}
                     placeholder="0"
-                    value={price ? formatNumber(price) : ''}
-                    onChange={(e) => {
-                      const raw = parseNumberFromInput(e.target.value);
-                      setPrice(raw > 0 ? raw.toString() : '');
-                    }}
                     required
                   />
                 </div>
@@ -180,21 +183,35 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   placeholder="Pcs, Meter, Rol, Dus..."
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
-                  list="unit-presets"
+                  list="unit-db-list"
                 />
-                <datalist id="unit-presets">
-                  <option value="Pcs" />
-                  <option value="Meter" />
-                  <option value="Batang" />
-                  <option value="Rol" />
-                  <option value="Set" />
-                  <option value="Dus" />
-                  <option value="Zak" />
-                  <option value="Kg" />
-                  <option value="Liter" />
-                  <option value="Tube" />
-                  <option value="Lembar" />
+                <datalist id="unit-db-list">
+                  {availableUnits.map((u) => (
+                    <option key={u} value={u} />
+                  ))}
                 </datalist>
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  {availableUnits.slice(0, 5).map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      className="category-pill-btn"
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '0.7rem',
+                        background: unit === u ? '#dbeafe' : '#f1f5f9',
+                        color: unit === u ? '#1d4ed8' : '#475569',
+                        border: '1px solid',
+                        borderColor: unit === u ? '#93c5fd' : '#e2e8f0',
+                        borderRadius: '999px',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => setUnit(u)}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -207,18 +224,35 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 placeholder="Perkakas, Kelistrikan, Plumbing, Bangunan..."
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                list="category-presets"
+                list="category-db-list"
               />
-              <datalist id="category-presets">
-                <option value="Kelistrikan" />
-                <option value="Perkakas" />
-                <option value="Plumbing" />
-                <option value="Bahan Bangunan" />
-                <option value="Bahan Perekat" />
-                <option value="Baut & Mur" />
-                <option value="Alat Ukur" />
-                <option value="Umum" />
+              <datalist id="category-db-list">
+                {availableCategories.map((c) => (
+                  <option key={c} value={c} />
+                ))}
               </datalist>
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                {availableCategories.slice(0, 6).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    className="category-pill-btn"
+                    style={{
+                      padding: '2px 8px',
+                      fontSize: '0.7rem',
+                      background: category === c ? '#dbeafe' : '#f1f5f9',
+                      color: category === c ? '#1d4ed8' : '#475569',
+                      border: '1px solid',
+                      borderColor: category === c ? '#93c5fd' : '#e2e8f0',
+                      borderRadius: '999px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setCategory(c)}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

@@ -5,6 +5,7 @@ export interface Product {
   price: number;
   category?: string;
   unit?: string;
+  createdBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,6 +31,7 @@ export interface Transaction {
   changeAmount: number;
   paymentMethod: 'cash' | 'transfer' | 'qris';
   customerName?: string;
+  cashierName?: string;
   notes?: string;
 }
 
@@ -50,10 +52,12 @@ export interface StoreProfile {
 export type UserRole = 'admin' | 'kasir';
 
 export interface UserAccount {
-  id: string;
+  id: number | string;
   username: string;
   password: string;
   name: string;
   role: UserRole;
   createdAt?: string;
+  updatedAt?: string;
 }
+

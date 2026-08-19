@@ -71,11 +71,19 @@ export const initTursoTables = async (force: boolean = false): Promise<boolean> 
         price REAL NOT NULL,
         unit TEXT DEFAULT 'Pcs',
         category TEXT DEFAULT 'Umum',
+        created_by TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         is_deleted INTEGER DEFAULT 0
       );
     `);
+
+    // Safe migration: add created_by to products if column missing
+    try {
+      await client.execute(`ALTER TABLE products ADD COLUMN created_by TEXT;`);
+    } catch {
+      // Column already exists
+    }
 
     // 2. Table: transactions
     await client.execute(`
@@ -89,11 +97,19 @@ export const initTursoTables = async (force: boolean = false): Promise<boolean> 
         change_amount REAL NOT NULL,
         payment_method TEXT DEFAULT 'cash',
         customer_name TEXT,
+        cashier_name TEXT,
         notes TEXT,
         created_at TEXT NOT NULL,
         is_deleted INTEGER DEFAULT 0
       );
     `);
+
+    // Safe migration: add cashier_name to transactions if column missing
+    try {
+      await client.execute(`ALTER TABLE transactions ADD COLUMN cashier_name TEXT;`);
+    } catch {
+      // Column already exists
+    }
 
     // 3. Table: store_profile
     await client.execute(`
@@ -114,10 +130,10 @@ export const initTursoTables = async (force: boolean = false): Promise<boolean> 
       );
     `);
 
-    // 4. Table: users
+    // 4. Table: users (INTEGER PRIMARY KEY AUTOINCREMENT)
     await client.execute(`
       CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
         name TEXT NOT NULL,
@@ -137,14 +153,14 @@ export const initTursoTables = async (force: boolean = false): Promise<boolean> 
         {
           sql: `
             INSERT OR IGNORE INTO users (id, username, password, name, role, created_at, updated_at, is_deleted)
-            VALUES ('user-admin', 'admin', 'admin123', 'Administrator', 'admin', ?, ?, 0);
+            VALUES (1, 'admin', 'admin123', 'Administrator', 'admin', ?, ?, 0);
           `,
           args: [now, now],
         },
         {
           sql: `
             INSERT OR IGNORE INTO users (id, username, password, name, role, created_at, updated_at, is_deleted)
-            VALUES ('user-kasir', 'kasir', 'kasir123', 'Kasir 01', 'kasir', ?, ?, 0);
+            VALUES (2, 'kasir', 'kasir123', 'Kasir 01', 'kasir', ?, ?, 0);
           `,
           args: [now, now],
         },
@@ -184,7 +200,7 @@ export const fetchAllProductsFromTurso = async (): Promise<Product[]> => {
   if (!client) return [];
 
   const result = await client.execute(`
-    SELECT id, name, aliases, price, unit, category, created_at, updated_at
+    SELECT id, name, aliases, price, unit, category, created_by, created_at, updated_at
     FROM products
     WHERE is_deleted = 0
     ORDER BY updated_at DESC;
@@ -205,6 +221,7 @@ export const fetchAllProductsFromTurso = async (): Promise<Product[]> => {
       price: Number(row.price),
       unit: String(row.unit || 'Pcs'),
       category: String(row.category || 'Umum'),
+      createdBy: row.created_by ? String(row.created_by) : undefined,
       createdAt: String(row.created_at || new Date().toISOString()),
       updatedAt: String(row.updated_at || new Date().toISOString()),
     };
@@ -217,14 +234,15 @@ export const upsertProductToTurso = async (product: Product): Promise<void> => {
 
   await client.execute({
     sql: `
-      INSERT INTO products (id, name, aliases, price, unit, category, created_at, updated_at, is_deleted)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+      INSERT INTO products (id, name, aliases, price, unit, category, created_by, created_at, updated_at, is_deleted)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         aliases = excluded.aliases,
         price = excluded.price,
         unit = excluded.unit,
         category = excluded.category,
+        created_by = COALESCE(excluded.created_by, products.created_by),
         updated_at = excluded.updated_at,
         is_deleted = 0;
     `,
@@ -235,6 +253,7 @@ export const upsertProductToTurso = async (product: Product): Promise<void> => {
       product.price,
       product.unit || 'Pcs',
       product.category || 'Umum',
+      product.createdBy || null,
       product.createdAt || new Date().toISOString(),
       product.updatedAt || new Date().toISOString(),
     ],
@@ -261,14 +280,15 @@ export const batchUpsertProductsToTurso = async (products: Product[]): Promise<v
     const chunk = products.slice(i, i + CHUNK_SIZE);
     const statements = chunk.map((p) => ({
       sql: `
-        INSERT INTO products (id, name, aliases, price, unit, category, created_at, updated_at, is_deleted)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+        INSERT INTO products (id, name, aliases, price, unit, category, created_by, created_at, updated_at, is_deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         ON CONFLICT(id) DO UPDATE SET
           name = excluded.name,
           aliases = excluded.aliases,
           price = excluded.price,
           unit = excluded.unit,
           category = excluded.category,
+          created_by = COALESCE(excluded.created_by, products.created_by),
           updated_at = excluded.updated_at,
           is_deleted = 0;
       `,
@@ -279,6 +299,7 @@ export const batchUpsertProductsToTurso = async (products: Product[]): Promise<v
         p.price,
         p.unit || 'Pcs',
         p.category || 'Umum',
+        p.createdBy || null,
         p.createdAt || new Date().toISOString(),
         p.updatedAt || new Date().toISOString(),
       ],
@@ -295,7 +316,7 @@ export const fetchAllTransactionsFromTurso = async (): Promise<Transaction[]> =>
   if (!client) return [];
 
   const result = await client.execute(`
-    SELECT id, invoice_no, date, items, total_amount, cash_amount, change_amount, payment_method, customer_name, notes
+    SELECT id, invoice_no, date, items, total_amount, cash_amount, change_amount, payment_method, customer_name, cashier_name, notes
     FROM transactions
     WHERE is_deleted = 0
     ORDER BY date DESC;
@@ -319,6 +340,7 @@ export const fetchAllTransactionsFromTurso = async (): Promise<Transaction[]> =>
       changeAmount: Number(row.change_amount),
       paymentMethod: (row.payment_method || 'cash') as 'cash' | 'transfer' | 'qris',
       customerName: row.customer_name ? String(row.customer_name) : undefined,
+      cashierName: row.cashier_name ? String(row.cashier_name) : undefined,
       notes: row.notes ? String(row.notes) : undefined,
     };
   });
@@ -331,8 +353,8 @@ export const insertTransactionToTurso = async (trx: Transaction): Promise<void> 
   await client.execute({
     sql: `
       INSERT INTO transactions (
-        id, invoice_no, date, items, total_amount, cash_amount, change_amount, payment_method, customer_name, notes, created_at, is_deleted
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        id, invoice_no, date, items, total_amount, cash_amount, change_amount, payment_method, customer_name, cashier_name, notes, created_at, is_deleted
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
       ON CONFLICT(id) DO UPDATE SET
         invoice_no = excluded.invoice_no,
         date = excluded.date,
@@ -342,6 +364,7 @@ export const insertTransactionToTurso = async (trx: Transaction): Promise<void> 
         change_amount = excluded.change_amount,
         payment_method = excluded.payment_method,
         customer_name = excluded.customer_name,
+        cashier_name = excluded.cashier_name,
         notes = excluded.notes,
         is_deleted = 0;
     `,
@@ -355,6 +378,7 @@ export const insertTransactionToTurso = async (trx: Transaction): Promise<void> 
       trx.changeAmount,
       trx.paymentMethod || 'cash',
       trx.customerName || null,
+      trx.cashierName || null,
       trx.notes || null,
       trx.date || new Date().toISOString(),
     ],
@@ -381,8 +405,8 @@ export const batchInsertTransactionsToTurso = async (transactions: Transaction[]
     const statements = chunk.map((trx) => ({
       sql: `
         INSERT INTO transactions (
-          id, invoice_no, date, items, total_amount, cash_amount, change_amount, payment_method, customer_name, notes, created_at, is_deleted
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+          id, invoice_no, date, items, total_amount, cash_amount, change_amount, payment_method, customer_name, cashier_name, notes, created_at, is_deleted
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         ON CONFLICT(id) DO UPDATE SET
           invoice_no = excluded.invoice_no,
           date = excluded.date,
@@ -392,6 +416,7 @@ export const batchInsertTransactionsToTurso = async (transactions: Transaction[]
           change_amount = excluded.change_amount,
           payment_method = excluded.payment_method,
           customer_name = excluded.customer_name,
+          cashier_name = excluded.cashier_name,
           notes = excluded.notes,
           is_deleted = 0;
       `,
@@ -405,6 +430,7 @@ export const batchInsertTransactionsToTurso = async (transactions: Transaction[]
         trx.changeAmount,
         trx.paymentMethod || 'cash',
         trx.customerName || null,
+        trx.cashierName || null,
         trx.notes || null,
         trx.date || new Date().toISOString(),
       ],
@@ -493,19 +519,20 @@ export const fetchAllUsersFromTurso = async (): Promise<UserAccount[]> => {
   if (!client) return [];
 
   const result = await client.execute(`
-    SELECT id, username, password, name, role, created_at
+    SELECT id, username, password, name, role, created_at, updated_at
     FROM users
     WHERE is_deleted = 0
-    ORDER BY created_at ASC;
+    ORDER BY id ASC;
   `);
 
   return result.rows.map((row: any) => ({
-    id: String(row.id),
+    id: typeof row.id === 'number' ? row.id : (!isNaN(Number(row.id)) ? Number(row.id) : String(row.id)),
     username: String(row.username),
     password: String(row.password),
     name: String(row.name),
     role: (row.role || 'kasir') as 'admin' | 'kasir',
     createdAt: String(row.created_at || new Date().toISOString()),
+    updatedAt: String(row.updated_at || row.created_at || new Date().toISOString()),
   }));
 };
 
@@ -533,12 +560,12 @@ export const upsertUserToTurso = async (user: UserAccount): Promise<void> => {
       user.name.trim(),
       user.role,
       user.createdAt || now,
-      now,
+      user.updatedAt || now,
     ],
   });
 };
 
-export const deleteUserFromTurso = async (id: string): Promise<void> => {
+export const deleteUserFromTurso = async (id: number | string): Promise<void> => {
   const client = getTursoClient();
   if (!client) return;
 
@@ -573,7 +600,7 @@ export const batchUpsertUsersToTurso = async (users: UserAccount[]): Promise<voi
       u.name.trim(),
       u.role,
       u.createdAt || now,
-      now,
+      u.updatedAt || now,
     ],
   }));
 

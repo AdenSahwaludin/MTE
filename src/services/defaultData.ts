@@ -16,7 +16,7 @@ export const DEFAULT_STORE_PROFILE: StoreProfile = {
 
 export const DEFAULT_USERS: UserAccount[] = [
   {
-    id: 'user-admin',
+    id: 1,
     username: 'admin',
     password: 'admin123',
     name: 'Administrator',
@@ -24,7 +24,7 @@ export const DEFAULT_USERS: UserAccount[] = [
     createdAt: new Date().toISOString(),
   },
   {
-    id: 'user-kasir',
+    id: 2,
     username: 'kasir',
     password: 'kasir123',
     name: 'Kasir 01',

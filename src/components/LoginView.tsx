@@ -260,8 +260,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </form>
 
         <div className="login-footer">
-          <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px' }}>
-            🔒 {t.sessionDurationHint}
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px' }}>
+            <Lock size={12} /> {t.sessionDurationHint}
           </span>
           <span>&copy; {new Date().getFullYear()} Mega Tehnik Elektronik &bull; {t.footerText}</span>
         </div>

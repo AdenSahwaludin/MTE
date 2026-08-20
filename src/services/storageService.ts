@@ -163,7 +163,7 @@ export const addOrUpdateProduct = (
   price: number,
   aliases: string[] = [],
   unit: string = 'Pcs',
-  category: string = 'Umum',
+  category: string = '',
   id?: string,
   createdBy?: string
 ): { product: Product; isNew: boolean } => {
@@ -181,7 +181,7 @@ export const addOrUpdateProduct = (
         price: Math.max(0, price),
         aliases: aliases.map((a) => a.trim()).filter(Boolean),
         unit: unit.trim() || 'Pcs',
-        category: category.trim() || 'Umum',
+        category: category.trim() || '',
         updatedAt: now,
       };
       products[index] = updatedProduct;
@@ -206,7 +206,7 @@ export const addOrUpdateProduct = (
       price: price > 0 ? price : existing.price,
       aliases: mergedAliases,
       unit: unit.trim() || existing.unit || 'Pcs',
-      category: category.trim() || existing.category || 'Umum',
+      category: category.trim() !== '' ? category.trim() : (existing.category || ''),
       updatedAt: now,
     };
     products[existingIndex] = updatedProduct;
@@ -222,7 +222,7 @@ export const addOrUpdateProduct = (
     aliases: aliases.map((a) => a.trim()).filter(Boolean),
     price,
     unit: unit.trim() || 'Pcs',
-    category: category.trim() || 'Umum',
+    category: category.trim() || '',
     createdBy: creatorName,
     createdAt: now,
     updatedAt: now,

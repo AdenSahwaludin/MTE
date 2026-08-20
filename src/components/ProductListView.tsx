@@ -54,7 +54,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
         (p.category && p.category.toLowerCase().includes(q));
 
       const matchesCategory =
-        selectedCategory === 'all' || (p.category || 'Umum') === selectedCategory;
+        selectedCategory === 'all' || (p.category || '') === selectedCategory;
 
       return matchesSearch && matchesCategory;
     });
@@ -169,7 +169,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
           >
             <option value="all">Semua Kategori ({products.length})</option>
             {categories.map((cat) => {
-              const count = products.filter((p) => (p.category || 'Umum') === cat).length;
+              const count = products.filter((p) => (p.category || '') === cat).length;
               return (
                 <option key={cat} value={cat}>
                   {cat} ({count})
@@ -235,8 +235,8 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
                       )}
                     </td>
                     <td>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>
-                        {p.category || 'Umum'}
+                      <div style={{ fontSize: '0.85rem', fontWeight: 500, color: p.category ? 'var(--text-main)' : '#94a3b8' }}>
+                        {p.category ? p.category : '-'}
                       </div>
                       <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
                         Satuan: {p.unit || 'Pcs'}

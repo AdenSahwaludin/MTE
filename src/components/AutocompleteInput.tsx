@@ -7,7 +7,8 @@ import { Tag, Sparkles, X } from 'lucide-react';
 interface AutocompleteInputProps {
   value: string;
   onChange: (val: string) => void;
-  onSelectProduct: (product: Product) => void;
+  onSelectProduct: (product: Product, andAddToCart?: boolean) => void;
+  onEnterWithoutMatch?: () => void;
   placeholder?: string;
   autoFocus?: boolean;
   inputRef?: React.RefObject<HTMLInputElement | null>;
@@ -17,6 +18,7 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   value,
   onChange,
   onSelectProduct,
+  onEnterWithoutMatch,
   placeholder = 'Ketik nama barang atau nama lain/alias...',
   autoFocus = false,
   inputRef,
@@ -51,26 +53,39 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!isOpen || matches.length === 0) return;
-
     if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev < matches.length - 1 ? prev + 1 : 0));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : matches.length - 1));
-    } else if (e.key === 'Enter') {
-      if (selectedIndex >= 0 && selectedIndex < matches.length) {
+      if (matches.length > 0) {
         e.preventDefault();
-        handleSelect(matches[selectedIndex].product);
+        setIsOpen(true);
+        setSelectedIndex((prev) => (prev < matches.length - 1 ? prev + 1 : 0));
+      }
+    } else if (e.key === 'ArrowUp') {
+      if (matches.length > 0) {
+        e.preventDefault();
+        setIsOpen(true);
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : matches.length - 1));
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (matches.length > 0) {
+        // Auto-complete the highlighted item OR the top/first suggestion and immediately add to cart!
+        const targetProduct = (selectedIndex >= 0 && selectedIndex < matches.length)
+          ? matches[selectedIndex].product
+          : matches[0].product;
+        handleSelect(targetProduct, true);
+      } else {
+        // No suggestions matching: trigger parent handler
+        if (onEnterWithoutMatch) {
+          onEnterWithoutMatch();
+        }
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false);
     }
   };
 
-  const handleSelect = (product: Product) => {
-    onSelectProduct(product);
+  const handleSelect = (product: Product, andAddToCart: boolean = false) => {
+    onSelectProduct(product, andAddToCart);
     setIsOpen(false);
   };
 

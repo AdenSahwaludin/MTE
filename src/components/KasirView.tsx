@@ -100,16 +100,69 @@ export const KasirView: React.FC<KasirViewProps> = ({
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   });
 
+  // Add item directly to cart from autocomplete suggestion on Enter
+  const addItemToCartDirect = (prod: Product, qty: number = 1) => {
+    const qtyNum = Math.max(1, qty || 1);
+    const priceNum = prod.price;
+
+    const existingCartIndex = cartItems.findIndex(
+      (item) => item.name.toLowerCase() === prod.name.trim().toLowerCase()
+    );
+
+    if (existingCartIndex !== -1) {
+      const updatedCart = [...cartItems];
+      const existing = updatedCart[existingCartIndex];
+      const newQty = existing.qty + qtyNum;
+      updatedCart[existingCartIndex] = {
+        ...existing,
+        qty: newQty,
+        price: priceNum > 0 ? priceNum : existing.price,
+        subtotal: (priceNum > 0 ? priceNum : existing.price) * newQty,
+      };
+      setCartItems(updatedCart);
+    } else {
+      const newItem: CartItem = {
+        id: 'cart-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        productId: prod.id,
+        name: prod.name.trim(),
+        price: priceNum,
+        qty: qtyNum,
+        unit: prod.unit || 'Pcs',
+        subtotal: priceNum * qtyNum,
+        isNewProduct: false,
+      };
+      setCartItems((prev) => [...prev, newItem]);
+    }
+
+    // Reset input fields and keep focus on name input for fast continuous scanning/typing
+    setItemName('');
+    setItemPrice('');
+    setItemQty(1);
+    setSelectedProduct(null);
+    focusInputIfDesktop(nameInputRef);
+  };
+
   // When user selects a product from autocomplete dropdown
-  const handleSelectProduct = (product: Product) => {
+  const handleSelectProduct = (product: Product, andAddToCart: boolean = false) => {
     setSelectedProduct(product);
     setItemName(product.name);
     setItemPrice(product.price > 0 ? product.price.toString() : '');
-    // If product has no price yet, auto-focus price input; otherwise focus qty
-    if (product.price <= 0) {
+
+    if (andAddToCart && product.price > 0) {
+      addItemToCartDirect(product, itemQty || 1);
+    } else if (product.price <= 0) {
       focusInputIfDesktop(priceInputRef);
     } else {
       focusInputIfDesktop(qtyInputRef);
+    }
+  };
+
+  const handleEnterWithoutMatch = () => {
+    const priceNum = parseNumberFromInput(itemPrice);
+    if (priceNum > 0 && itemName.trim()) {
+      handleAddItem();
+    } else if (itemName.trim()) {
+      focusInputIfDesktop(priceInputRef);
     }
   };
 
@@ -143,7 +196,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     let finalProductId = matchedProd?.id;
     let finalUnit = matchedProd?.unit || 'Pcs';
 
-    // Auto-save logic: if product not found in database and has valid price, save it now!
+    // Auto-save logic: if product not found in database and has valid price, save it with empty default category!
     if (!matchedProd && storeProfile.autoSaveProducts && priceNum > 0) {
       const activeUser = getCurrentUser();
       const saved = addOrUpdateProduct(
@@ -151,7 +204,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
         priceNum,
         [],
         'Pcs',
-        'Umum',
+        '', // default category empty string instead of 'Umum'
         undefined,
         activeUser?.name || 'Kasir'
       );
@@ -413,7 +466,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 <ShoppingCart size={20} color="#2563eb" /> Kasir & Generate Struk
               </h2>
               <div className="shortcut-tip hide-on-mobile">
-                <Keyboard size={14} /> <kbd>Enter</kbd> tambah item | <kbd>F2</kbd> Proses Bayar | <kbd>F4</kbd> Reset
+                <Keyboard size={14} /> <kbd>Enter</kbd> Pilih & Tambah | <kbd>F2</kbd> Proses Bayar | <kbd>F4</kbd> Reset
               </div>
             </div>
 
@@ -432,6 +485,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                     }
                   }}
                   onSelectProduct={handleSelectProduct}
+                  onEnterWithoutMatch={handleEnterWithoutMatch}
                   placeholder="Ketik nama barang atau alias..."
                 />
               </div>

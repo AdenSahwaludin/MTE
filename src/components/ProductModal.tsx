@@ -24,7 +24,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [unit, setUnit] = useState('Pcs');
-  const [category, setCategory] = useState('Umum');
+  const [category, setCategory] = useState('');
   const [aliases, setAliases] = useState<string[]>([]);
   const [currentAliasInput, setCurrentAliasInput] = useState('');
 
@@ -40,13 +40,13 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       setName(productToEdit.name);
       setPrice(productToEdit.price ? productToEdit.price.toString() : '');
       setUnit(productToEdit.unit || 'Pcs');
-      setCategory(productToEdit.category || 'Umum');
+      setCategory(productToEdit.category || '');
       setAliases(productToEdit.aliases || []);
     } else {
       setName('');
       setPrice('');
       setUnit('Pcs');
-      setCategory('Umum');
+      setCategory('');
       setAliases([]);
     }
     setCurrentAliasInput('');
@@ -92,7 +92,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       priceNum,
       finalAliases,
       unit.trim() || 'Pcs',
-      category.trim() || 'Umum',
+      category.trim() || '',
       productToEdit?.id
     );
 

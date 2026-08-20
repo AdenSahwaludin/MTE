@@ -37,16 +37,22 @@
     }
 
     #pwa-boot-loader {
-      position: fixed;
-      inset: 0;
-      background: #060a17;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
-      color: #ffffff;
-      z-index: 99999;
+      display: none;
+    }
+
+    @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+      #pwa-boot-loader {
+        position: fixed;
+        inset: 0;
+        background: #060a17;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #ffffff;
+        z-index: 99999;
+      }
     }
 
     @keyframes pwaBarPulse {
@@ -70,7 +76,7 @@
 
 <body>
   <div id="root">
-    <!-- PWA/App Instant Boot Screen: Prevents blank black screen before JS bundle executes -->
+    <!-- PWA / App Boot Screen (Only visible in Installed App / PWA container, hidden on standard Web) -->
     <div id="pwa-boot-loader">
       <img src="/logo.webp" alt="Mega Tehnik Elektronik"
         style="width:110px;height:110px;object-fit:contain;margin-bottom:12px;filter:drop-shadow(0 0 16px rgba(33,150,243,0.4));" />
@@ -84,6 +90,31 @@
       </div>
     </div>
   </div>
+
+  <script>
+    // Show boot loader ONLY if running as an installed PWA or Native App
+    (function () {
+      try {
+        var isApp = (
+          (window.matchMedia && (
+            window.matchMedia('(display-mode: standalone)').matches ||
+            window.matchMedia('(display-mode: minimal-ui)').matches ||
+            window.matchMedia('(display-mode: fullscreen)').matches
+          )) ||
+          window.navigator.standalone === true ||
+          (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+          document.referrer.indexOf('android-app://') !== -1 ||
+          location.search.indexOf('source=pwa') !== -1 ||
+          location.search.indexOf('source=twa') !== -1
+        );
+        if (isApp) {
+          var loader = document.getElementById('pwa-boot-loader');
+          if (loader) loader.style.display = 'flex';
+        }
+      } catch (e) { }
+    })();
+  </script>
+
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

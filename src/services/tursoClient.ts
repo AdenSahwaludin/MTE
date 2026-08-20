@@ -1,17 +1,20 @@
 import { createClient, Client } from '@libsql/client/web';
 import { Product, Transaction, StoreProfile, UserAccount } from '../types';
 
-// Extract credentials injected via Vite define / environment variables
+const DEFAULT_TURSO_URL = 'libsql://mega-teknik-elektronik-adensahwaludin.aws-ap-northeast-1.turso.io';
+const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODcxNDg4MDYsImlkIjoiMDFhMDFhNWUtOGIwMS03NzgwLTliYjQtOTQ5YWIxYTk1M2VlIiwia2lkIjoiRVBsci1WZXk4cFpncEZUYmdmc3NmTXVMNUgzUWhDQVdzQk9sS204blJtMCIsInJpZCI6IjFmYTdhZmNlLWQ5ZWQtNDBmYi1hNThmLTUyZmE0OTNlZDNmYSJ9.-s_67DnajXUNcB9u4QBs-rz4HANrTWqICLWadCQ834fKIogiVv2Iut8KYAxeriYvRoL79HDoIfBtJ89u9ARhDg';
+
+// Extract credentials injected via Vite define / environment variables with fallback
 const rawUrl = (
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TURSO_DATABASE_URL) ||
   (typeof process !== 'undefined' && process.env?.TURSO_DATABASE_URL) ||
-  ''
+  DEFAULT_TURSO_URL
 ).trim();
 
 const rawToken = (
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TURSO_AUTH_TOKEN) ||
   (typeof process !== 'undefined' && process.env?.TURSO_AUTH_TOKEN) ||
-  ''
+  DEFAULT_TURSO_TOKEN
 ).trim();
 
 // Normalize URL for web client fetch protocol

@@ -7,10 +7,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
     define: {
-      'process.env.TURSO_DATABASE_URL': JSON.stringify(env.DATABASE_URL || env.VITE_TURSO_DATABASE_URL || ''),
-      'process.env.TURSO_AUTH_TOKEN': JSON.stringify(env.TOKEN_TURSO || env.VITE_TURSO_AUTH_TOKEN || ''),
-      'import.meta.env.VITE_TURSO_DATABASE_URL': JSON.stringify(env.DATABASE_URL || env.VITE_TURSO_DATABASE_URL || ''),
-      'import.meta.env.VITE_TURSO_AUTH_TOKEN': JSON.stringify(env.TOKEN_TURSO || env.VITE_TURSO_AUTH_TOKEN || ''),
+      'process.env.TURSO_DATABASE_URL': JSON.stringify(env.DATABASE_URL || env.VITE_TURSO_DATABASE_URL || 'libsql://mega-teknik-elektronik-adensahwaludin.aws-ap-northeast-1.turso.io'),
+      'process.env.TURSO_AUTH_TOKEN': JSON.stringify(env.TOKEN_TURSO || env.VITE_TURSO_AUTH_TOKEN || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODcxNDg4MDYsImlkIjoiMDFhMDFhNWUtOGIwMS03NzgwLTliYjQtOTQ5YWIxYTk1M2VlIiwia2lkIjoiRVBsci1WZXk4cFpncEZUYmdmc3NmTXVMNUgzUWhDQVdzQk9sS204blJtMCIsInJpZCI6IjFmYTdhZmNlLWQ5ZWQtNDBmYi1hNThmLTUyZmE0OTNlZDNmYSJ9.-s_67DnajXUNcB9u4QBs-rz4HANrTWqICLWadCQ834fKIogiVv2Iut8KYAxeriYvRoL79HDoIfBtJ89u9ARhDg'),
+      'import.meta.env.VITE_TURSO_DATABASE_URL': JSON.stringify(env.DATABASE_URL || env.VITE_TURSO_DATABASE_URL || 'libsql://mega-teknik-elektronik-adensahwaludin.aws-ap-northeast-1.turso.io'),
+      'import.meta.env.VITE_TURSO_AUTH_TOKEN': JSON.stringify(env.TOKEN_TURSO || env.VITE_TURSO_AUTH_TOKEN || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODcxNDg4MDYsImlkIjoiMDFhMDFhNWUtOGIwMS03NzgwLTliYjQtOTQ5YWIxYTk1M2VlIiwia2lkIjoiRVBsci1WZXk4cFpncEZUYmdmc3NmTXVMNUgzUWhDQVdzQk9sS204blJtMCIsInJpZCI6IjFmYTdhZmNlLWQ5ZWQtNDBmYi1hNThmLTUyZmE0OTNlZDNmYSJ9.-s_67DnajXUNcB9u4QBs-rz4HANrTWqICLWadCQ834fKIogiVv2Iut8KYAxeriYvRoL79HDoIfBtJ89u9ARhDg'),
     },
     plugins: [
       react(),

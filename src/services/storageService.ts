@@ -259,12 +259,29 @@ export const deleteTransaction = (id: string): void => {
   syncService.enqueue('DELETE_TRANSACTION', id);
 };
 
-export const generateInvoiceNumber = (): string => {
+export const generateInvoiceNumber = (transactions: Transaction[] = inMemoryTransactions): string => {
   const now = new Date();
-  const dateStr = now.toISOString().slice(2, 10).replace(/-/g, '');
-  const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
-  const randomSuffix = Math.floor(10 + Math.random() * 90);
-  return `MT-${dateStr}-${timeStr}${randomSuffix}`;
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yy = String(now.getFullYear()).slice(-2);
+  const dayPrefix = `MTE-${dd}-${mm}-${yy}-`;
+
+  let maxSeq = 0;
+
+  // Scan all existing transactions for matching day sequence
+  transactions.forEach((t) => {
+    if (t.invoiceNo && t.invoiceNo.startsWith(dayPrefix)) {
+      const suffix = t.invoiceNo.slice(dayPrefix.length);
+      const num = parseInt(suffix, 10);
+      if (!isNaN(num) && num > maxSeq) {
+        maxSeq = num;
+      }
+    }
+  });
+
+  const nextSeq = maxSeq + 1;
+  const seqPadded = String(nextSeq).padStart(3, '0');
+  return `${dayPrefix}${seqPadded}`;
 };
 
 // --- STORE PROFILE ---

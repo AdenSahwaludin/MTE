@@ -28,11 +28,14 @@ export const ProductModal: React.FC<ProductModalProps> = ({
   const [aliases, setAliases] = useState<string[]>([]);
   const [currentAliasInput, setCurrentAliasInput] = useState('');
 
+  const [errorMessage, setErrorMessage] = useState('');
+
   // Fetch unique options currently present in database
   const availableUnits = useMemo(() => getUniqueUnits(), [isOpen]);
   const availableCategories = useMemo(() => getUniqueCategories(), [isOpen]);
 
   useEffect(() => {
+    setErrorMessage('');
     if (productToEdit) {
       setName(productToEdit.name);
       setPrice(productToEdit.price ? productToEdit.price.toString() : '');
@@ -65,7 +68,18 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    setErrorMessage('');
+
+    if (!name.trim()) {
+      setErrorMessage('Nama produk tidak boleh kosong');
+      return;
+    }
+
+    const priceNum = price ? parseInt(price.replace(/\D/g, ''), 10) || 0 : 0;
+    if (priceNum <= 0) {
+      setErrorMessage('Harga satuan produk harus lebih dari Rp 0 (tidak boleh 0 atau kosong)');
+      return;
+    }
 
     // Check if there is pending unadded text in alias input
     let finalAliases = [...aliases];
@@ -73,7 +87,6 @@ export const ProductModal: React.FC<ProductModalProps> = ({
       finalAliases.push(currentAliasInput.trim());
     }
 
-    const priceNum = price ? parseInt(price.replace(/\D/g, ''), 10) || 0 : 0;
     addOrUpdateProduct(
       name.trim(),
       priceNum,
@@ -99,6 +112,23 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
         <form onSubmit={handleSubmit} className="modal-form-wrapper">
           <div className="modal-body">
+            {errorMessage && (
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  color: '#b91c1c',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  marginBottom: '0.5rem',
+                }}
+              >
+                {errorMessage}
+              </div>
+            )}
+
             {/* Nama Produk Utama */}
             <div className="form-group">
               <label>Nama Produk Utama *</label>
@@ -109,7 +139,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                autoFocus
+                autoFocus={typeof window !== 'undefined' && !window.matchMedia('(hover: none) and (pointer: coarse)').matches && window.innerWidth >= 768}
               />
             </div>
 
@@ -190,28 +220,32 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                     <option key={u} value={u} />
                   ))}
                 </datalist>
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-                  {availableUnits.slice(0, 5).map((u) => (
-                    <button
-                      key={u}
-                      type="button"
-                      className="category-pill-btn"
-                      style={{
-                        padding: '2px 8px',
-                        fontSize: '0.7rem',
-                        background: unit === u ? '#dbeafe' : '#f1f5f9',
-                        color: unit === u ? '#1d4ed8' : '#475569',
-                        border: '1px solid',
-                        borderColor: unit === u ? '#93c5fd' : '#e2e8f0',
-                        borderRadius: '999px',
-                        cursor: 'pointer',
-                      }}
-                      onClick={() => setUnit(u)}
-                    >
-                      {u}
-                    </button>
-                  ))}
-                </div>
+                {availableUnits.length > 0 && (
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    {availableUnits.map((u) => (
+                      <button
+                        key={u}
+                        type="button"
+                        className="category-pill-btn"
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: unit.toLowerCase() === u.toLowerCase() ? 700 : 500,
+                          background: unit.toLowerCase() === u.toLowerCase() ? '#dbeafe' : '#f8fafc',
+                          color: unit.toLowerCase() === u.toLowerCase() ? '#1d4ed8' : '#475569',
+                          border: '1px solid',
+                          borderColor: unit.toLowerCase() === u.toLowerCase() ? '#93c5fd' : '#e2e8f0',
+                          borderRadius: '999px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onClick={() => setUnit(u)}
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -221,7 +255,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               <input
                 type="text"
                 className="form-input"
-                placeholder="Perkakas, Kelistrikan, Plumbing, Bangunan..."
+                placeholder="Ketik kategori..."
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 list="category-db-list"
@@ -231,28 +265,32 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   <option key={c} value={c} />
                 ))}
               </datalist>
-              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-                {availableCategories.slice(0, 6).map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    className="category-pill-btn"
-                    style={{
-                      padding: '2px 8px',
-                      fontSize: '0.7rem',
-                      background: category === c ? '#dbeafe' : '#f1f5f9',
-                      color: category === c ? '#1d4ed8' : '#475569',
-                      border: '1px solid',
-                      borderColor: category === c ? '#93c5fd' : '#e2e8f0',
-                      borderRadius: '999px',
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => setCategory(c)}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
+              {availableCategories.length > 0 && (
+                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '6px' }}>
+                  {availableCategories.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className="category-pill-btn"
+                      style={{
+                        padding: '3px 9px',
+                        fontSize: '0.74rem',
+                        fontWeight: category.toLowerCase() === c.toLowerCase() ? 700 : 500,
+                        background: category.toLowerCase() === c.toLowerCase() ? '#dbeafe' : '#f8fafc',
+                        color: category.toLowerCase() === c.toLowerCase() ? '#1d4ed8' : '#475569',
+                        border: '1.5px solid',
+                        borderColor: category.toLowerCase() === c.toLowerCase() ? '#93c5fd' : '#e2e8f0',
+                        borderRadius: '999px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onClick={() => setCategory(c)}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

@@ -134,8 +134,7 @@ export const generateNextProductId = (products: Product[] = inMemoryProducts): s
 };
 
 export const getUniqueUnits = (products: Product[] = inMemoryProducts): string[] => {
-  const defaults = ['Pcs', 'Meter', 'Batang', 'Rol', 'Set', 'Dus', 'Zak', 'Kg', 'Liter', 'Tube', 'Lembar'];
-  const set = new Set<string>(defaults);
+  const set = new Set<string>();
   products.forEach((p) => {
     if (p.unit && p.unit.trim()) {
       set.add(p.unit.trim());
@@ -145,8 +144,7 @@ export const getUniqueUnits = (products: Product[] = inMemoryProducts): string[]
 };
 
 export const getUniqueCategories = (products: Product[] = inMemoryProducts): string[] => {
-  const defaults = ['Umum', 'Kelistrikan', 'Perkakas', 'Plumbing', 'Bahan Bangunan', 'AC', 'Baut & Mur', 'Alat Ukur'];
-  const set = new Set<string>(defaults);
+  const set = new Set<string>();
   products.forEach((p) => {
     if (p.category && p.category.trim()) {
       set.add(p.category.trim());
@@ -175,7 +173,7 @@ export const addOrUpdateProduct = (
       const updatedProduct: Product = {
         ...products[index],
         name: name.trim(),
-        price,
+        price: Math.max(0, price),
         aliases: aliases.map((a) => a.trim()).filter(Boolean),
         unit: unit.trim() || 'Pcs',
         category: category.trim() || 'Umum',
@@ -202,7 +200,8 @@ export const addOrUpdateProduct = (
       ...existing,
       price: price > 0 ? price : existing.price,
       aliases: mergedAliases,
-      unit: unit || existing.unit,
+      unit: unit.trim() || existing.unit || 'Pcs',
+      category: category.trim() || existing.category || 'Umum',
       updatedAt: now,
     };
     products[existingIndex] = updatedProduct;

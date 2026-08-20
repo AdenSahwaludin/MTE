@@ -19,9 +19,21 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
       background-color: #060a17;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    #root {
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
     }
 
     #pwa-boot-loader {

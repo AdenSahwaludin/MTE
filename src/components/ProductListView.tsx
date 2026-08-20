@@ -32,13 +32,15 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // Extract unique categories
+  // Extract unique categories from actual products in DB
   const categories = useMemo(() => {
     const set = new Set<string>();
     products.forEach((p) => {
-      if (p.category) set.add(p.category);
+      if (p.category && p.category.trim()) {
+        set.add(p.category.trim());
+      }
     });
-    return Array.from(set);
+    return Array.from(set).sort();
   }, [products]);
 
   // Filter products based on search query (matching name OR aliases) and category
@@ -52,7 +54,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
         (p.category && p.category.toLowerCase().includes(q));
 
       const matchesCategory =
-        selectedCategory === 'all' || p.category === selectedCategory;
+        selectedCategory === 'all' || (p.category || 'Umum') === selectedCategory;
 
       return matchesSearch && matchesCategory;
     });
@@ -161,16 +163,19 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
         {categories.length > 0 && (
           <select
             className="form-input"
-            style={{ width: 'auto', minWidth: '160px' }}
+            style={{ width: 'auto', minWidth: '170px' }}
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
           >
             <option value="all">Semua Kategori ({products.length})</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
+            {categories.map((cat) => {
+              const count = products.filter((p) => (p.category || 'Umum') === cat).length;
+              return (
+                <option key={cat} value={cat}>
+                  {cat} ({count})
+                </option>
+              );
+            })}
           </select>
         )}
       </div>

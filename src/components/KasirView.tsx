@@ -8,10 +8,11 @@ import {
   getCurrentUser,
 } from '../services/storageService';
 import { printViaRawBT, printViaThermer } from '../services/directPrintService';
-import { printDirectBluetooth, isWebBluetoothSupported } from '../services/bluetoothPrintService';
+import { printDirectBluetooth } from '../services/bluetoothPrintService';
 import { AutocompleteInput } from './AutocompleteInput';
 import { FormattedNumberInput } from './FormattedNumberInput';
 import { ReceiptPreview } from './ReceiptPreview';
+import { PaymentModal } from './PaymentModal';
 import { formatRupiah, formatNumber, parseNumberFromInput } from '../utils/formatters';
 import {
   Plus,
@@ -19,17 +20,10 @@ import {
   Printer,
   RotateCcw,
   ShoppingCart,
-  DollarSign,
   Keyboard,
   Sparkles,
-  CheckCircle2,
-  AlertCircle,
-  Smartphone,
-  Share2,
-  Zap,
-  Bluetooth,
-  Save,
-  Check,
+  CreditCard,
+  ArrowRight,
 } from 'lucide-react';
 
 interface KasirViewProps {
@@ -60,25 +54,43 @@ export const KasirView: React.FC<KasirViewProps> = ({
   const [customerName, setCustomerName] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [showMobilePreview, setShowMobilePreview] = useState<boolean>(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
 
   const nameInputRef = useRef<HTMLInputElement>(null);
   const priceInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus name input on mount
+  const focusInputIfDesktop = (ref: React.RefObject<HTMLInputElement | null>) => {
+    if (typeof window === 'undefined') return;
+    const isMobileTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches || window.innerWidth < 768;
+    if (!isMobileTouch) {
+      ref.current?.focus();
+    }
+  };
+
+  // Focus name input on mount (only on desktop to prevent mobile keyboard popups & zoom)
   useEffect(() => {
-    nameInputRef.current?.focus();
+    focusInputIfDesktop(nameInputRef);
   }, []);
 
-  // Keyboard shortcut handlers (F2 = Print, F3 = Save without Print, F4 = Reset)
+  // Calculate Total & Change
+  const totalAmount = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const numericCash = parseNumberFromInput(cashAmount);
+  const changeAmount = numericCash - totalAmount;
+
+  // Keyboard shortcut handlers (F2 = Open Modal / Print, F3 = Save, F4 = Reset)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
         e.preventDefault();
-        handlePrintReceipt();
+        if (!isPaymentModalOpen) {
+          handleOpenPaymentModal();
+        }
       } else if (e.key === 'F3') {
         e.preventDefault();
-        handleSaveOnlyTransaction();
+        if (isPaymentModalOpen) {
+          handleSaveOnlyTransaction();
+        }
       } else if (e.key === 'F4') {
         e.preventDefault();
         handleResetTransaction();
@@ -88,19 +100,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   });
 
-  // Calculate Total & Change
-  const totalAmount = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const numericCash = parseNumberFromInput(cashAmount);
-  const changeAmount = numericCash - totalAmount;
-
   // When user selects a product from autocomplete dropdown
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
     setItemName(product.name);
-    setItemPrice(product.price.toString());
-    // Auto focus to qty or price
-    qtyInputRef.current?.focus();
-    qtyInputRef.current?.select();
+    setItemPrice(product.price > 0 ? product.price.toString() : '');
+    // If product has no price yet, auto-focus price input; otherwise focus qty
+    if (product.price <= 0) {
+      focusInputIfDesktop(priceInputRef);
+    } else {
+      focusInputIfDesktop(qtyInputRef);
+    }
   };
 
   // Add item to cart + Auto-save if it's a new product
@@ -110,11 +120,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
     const trimmedName = itemName.trim();
     if (!trimmedName) {
       showToast('Mohon masukkan nama barang', 'info');
-      nameInputRef.current?.focus();
+      focusInputIfDesktop(nameInputRef);
       return;
     }
 
     const priceNum = parseNumberFromInput(itemPrice);
+    if (priceNum <= 0) {
+      showToast('Harga satuan barang tidak boleh Rp 0. Silakan masukkan harga barang.', 'info');
+      focusInputIfDesktop(priceInputRef);
+      return;
+    }
+
     const qtyNum = Math.max(1, itemQty || 1);
 
     // Check if item is already in database
@@ -127,8 +143,8 @@ export const KasirView: React.FC<KasirViewProps> = ({
     let finalProductId = matchedProd?.id;
     let finalUnit = matchedProd?.unit || 'Pcs';
 
-    // Auto-save logic: if product not found in database, save it now!
-    if (!matchedProd && storeProfile.autoSaveProducts) {
+    // Auto-save logic: if product not found in database and has valid price, save it now!
+    if (!matchedProd && storeProfile.autoSaveProducts && priceNum > 0) {
       const activeUser = getCurrentUser();
       const saved = addOrUpdateProduct(
         trimmedName,
@@ -183,7 +199,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     setItemPrice('');
     setItemQty(1);
     setSelectedProduct(null);
-    nameInputRef.current?.focus();
+    focusInputIfDesktop(nameInputRef);
   };
 
   const handleUpdateCartQty = (id: string, delta: number) => {
@@ -258,12 +274,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
   const isInsufficientCash = numericCash > 0 && numericCash < totalAmount;
 
-  const setExactCash = () => {
-    setCashAmount(totalAmount.toString());
-  };
-
-  const addQuickCash = (amount: number) => {
-    setCashAmount(amount.toString());
+  const handleOpenPaymentModal = () => {
+    if (cartItems.length === 0) {
+      showToast('Keranjang masih kosong, tambahkan barang terlebih dahulu', 'info');
+      focusInputIfDesktop(nameInputRef);
+      return;
+    }
+    // Pre-fill cashAmount with total if empty
+    if (!cashAmount || parseNumberFromInput(cashAmount) <= 0) {
+      setCashAmount(totalAmount.toString());
+    }
+    setIsPaymentModalOpen(true);
   };
 
   const handleResetTransaction = () => {
@@ -276,13 +297,14 @@ export const KasirView: React.FC<KasirViewProps> = ({
     setNotes('');
     setSelectedProduct(null);
     setInvoiceNo(generateInvoiceNumber());
-    nameInputRef.current?.focus();
+    setIsPaymentModalOpen(false);
+    focusInputIfDesktop(nameInputRef);
   };
 
   const createCurrentTransaction = (): Transaction | null => {
     if (cartItems.length === 0) {
       showToast('Keranjang masih kosong, tambahkan barang terlebih dahulu', 'info');
-      nameInputRef.current?.focus();
+      focusInputIfDesktop(nameInputRef);
       return null;
     }
 
@@ -377,428 +399,304 @@ export const KasirView: React.FC<KasirViewProps> = ({
     handleResetTransaction();
   };
 
+  const totalQty = cartItems.reduce((sum, item) => sum + item.qty, 0);
+
   return (
-    <div className="pos-layout">
-      {/* Main Left Column: POS Controls */}
-      <div className="pos-main-panel">
-        {/* Quick Add Product Card */}
-        <div className="input-card">
-          <div className="card-header-title">
-            <h2>
-              <ShoppingCart size={20} color="#2563eb" /> Kasir & Generate Struk
-            </h2>
-            <div className="shortcut-tip hide-on-mobile">
-              <Keyboard size={14} /> <kbd>Enter</kbd> tambah item | <kbd>F3</kbd> Simpan Saja | <kbd>F2</kbd> Cetak Struk
+    <>
+      <div className="pos-layout">
+        {/* Main Left Column: POS Controls */}
+        <div className="pos-main-panel">
+          {/* Card 1: Quick Add Product Card */}
+          <div className="input-card">
+            <div className="card-header-title">
+              <h2>
+                <ShoppingCart size={20} color="#2563eb" /> Kasir & Generate Struk
+              </h2>
+              <div className="shortcut-tip hide-on-mobile">
+                <Keyboard size={14} /> <kbd>Enter</kbd> tambah item | <kbd>F2</kbd> Proses Bayar | <kbd>F4</kbd> Reset
+              </div>
             </div>
+
+            <form onSubmit={handleAddItem} className="quick-add-form">
+              {/* Nama Barang / Autocomplete */}
+              <div className="form-group">
+                <label>Nama Barang / Alias</label>
+                <AutocompleteInput
+                  inputRef={nameInputRef}
+                  value={itemName}
+                  onChange={(val) => {
+                    setItemName(val);
+                    // If user manually clears or types, clear selected product reference if name diverges
+                    if (selectedProduct && selectedProduct.name !== val) {
+                      setSelectedProduct(null);
+                    }
+                  }}
+                  onSelectProduct={handleSelectProduct}
+                  placeholder="Ketik nama barang atau alias..."
+                />
+              </div>
+
+              <div className="price-qty-grid">
+                {/* Harga Barang */}
+                <div className="form-group">
+                  <label>Harga Satuan</label>
+                  <div className="price-input-wrapper">
+                    <span className="currency-prefix">Rp</span>
+                    <FormattedNumberInput
+                      inputRef={priceInputRef}
+                      value={itemPrice}
+                      onChange={(val) => setItemPrice(val)}
+                      placeholder="0"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddItem();
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Qty */}
+                <div className="form-group">
+                  <label>Qty</label>
+                  <div className="qty-input-wrapper">
+                    <button
+                      type="button"
+                      className="qty-btn"
+                      onClick={() => setItemQty((q) => Math.max(1, q - 1))}
+                    >
+                      -
+                    </button>
+                    <input
+                      ref={qtyInputRef}
+                      type="number"
+                      min="1"
+                      className="form-input"
+                      value={itemQty}
+                      onChange={(e) => setItemQty(Math.max(1, parseInt(e.target.value) || 1))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddItem();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="qty-btn"
+                      onClick={() => setItemQty((q) => q + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tambah Button */}
+              <button type="submit" className="btn-add-item">
+                <Plus size={18} /> Tambah Item
+              </button>
+            </form>
           </div>
 
-          <form onSubmit={handleAddItem} className="quick-add-form">
-            {/* Nama Barang / Autocomplete */}
-            <div className="form-group">
-              <label>Nama Barang / Alias</label>
-              <AutocompleteInput
-                inputRef={nameInputRef}
-                value={itemName}
-                onChange={(val) => {
-                  setItemName(val);
-                  // If user manually clears or types, clear selected product reference if name diverges
-                  if (selectedProduct && selectedProduct.name !== val) {
-                    setSelectedProduct(null);
-                  }
-                }}
-                onSelectProduct={handleSelectProduct}
-                placeholder="Ketik nama barang atau alias..."
-                autoFocus
-              />
+          {/* Card 2: Cart Items Table Card */}
+          <div className="cart-card">
+            <div className="card-header-title" style={{ marginBottom: '0.5rem' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>
+                Daftar Barang Belanjaan ({cartItems.length} item • {totalQty} pcs)
+              </h3>
+              {cartItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setCartItems([])}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#ef4444',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Trash2 size={13} /> Kosongkan Keranjang
+                </button>
+              )}
             </div>
 
-            <div className="price-qty-grid">
-              {/* Harga Barang */}
-              <div className="form-group">
-                <label>Harga Satuan</label>
-                <div className="price-input-wrapper">
-                  <span className="currency-prefix">Rp</span>
-                  <FormattedNumberInput
-                    inputRef={priceInputRef}
-                    value={itemPrice}
-                    onChange={(val) => setItemPrice(val)}
-                    placeholder="0"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddItem();
-                      }
-                    }}
-                  />
-                </div>
+            {cartItems.length === 0 ? (
+              <div className="empty-cart-state">
+                <ShoppingCart className="empty-cart-icon" />
+                <p style={{ fontWeight: 600 }}>Belum ada barang di struk</p>
+                <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                  Ketik nama barang dan harga di atas, lalu klik <strong>Tambah Item</strong> atau tekan <kbd>Enter</kbd>.
+                </p>
               </div>
-
-              {/* Qty */}
-              <div className="form-group">
-                <label>Qty</label>
-                <div className="qty-input-wrapper">
-                  <button
-                    type="button"
-                    className="qty-btn"
-                    onClick={() => setItemQty((q) => Math.max(1, q - 1))}
-                  >
-                    -
-                  </button>
-                  <input
-                    ref={qtyInputRef}
-                    type="number"
-                    min="1"
-                    className="form-input"
-                    value={itemQty}
-                    onChange={(e) => setItemQty(Math.max(1, parseInt(e.target.value) || 1))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddItem();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="qty-btn"
-                    onClick={() => setItemQty((q) => q + 1)}
-                  >
-                    +
-                  </button>
-                </div>
+            ) : (
+              <div className="cart-table-wrapper">
+                <table className="cart-table">
+                  <thead>
+                    <tr>
+                      <th>Barang</th>
+                      <th style={{ textAlign: 'right' }}>Harga Satuan</th>
+                      <th style={{ textAlign: 'center', width: '120px' }}>Jumlah (Qty)</th>
+                      <th style={{ textAlign: 'right' }}>Subtotal</th>
+                      <th style={{ width: '40px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cartItems.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>
+                            {item.name}
+                            {item.isNewProduct && (
+                              <span className="badge-new-item">
+                                <Sparkles size={10} style={{ display: 'inline', marginRight: '2px' }} /> Auto-Saved
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                          {formatRupiah(item.price)}
+                        </td>
+                        <td>
+                          <div className="qty-input-wrapper" style={{ height: '32px', maxWidth: '100px', margin: '0 auto' }}>
+                            <button
+                              type="button"
+                              className="qty-btn"
+                              style={{ height: '32px', width: '26px' }}
+                              onClick={() => handleUpdateCartQty(item.id, -1)}
+                            >
+                              -
+                            </button>
+                            <span style={{ flex: 1, textAlign: 'center', fontWeight: 600, fontSize: '0.9rem' }}>
+                              {item.qty}
+                            </span>
+                            <button
+                              type="button"
+                              className="qty-btn"
+                              style={{ height: '32px', width: '26px' }}
+                              onClick={() => handleUpdateCartQty(item.id, 1)}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+                          {formatRupiah(item.subtotal)}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn-remove-item"
+                            onClick={() => handleRemoveCartItem(item.id)}
+                            title="Hapus item"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-
-            {/* Tambah Button */}
-            <button type="submit" className="btn-add-item">
-              <Plus size={18} /> Tambah Item
-            </button>
-          </form>
-        </div>
-
-        {/* Cart Items Table Card */}
-        <div className="cart-card">
-          <div className="card-header-title" style={{ marginBottom: '0.5rem' }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>
-              Daftar Barang Belanjaan ({cartItems.length} item)
-            </h3>
-            {cartItems.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setCartItems([])}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#ef4444',
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <Trash2 size={13} /> Kosongkan Keranjang
-              </button>
             )}
           </div>
 
-          {cartItems.length === 0 ? (
-            <div className="empty-cart-state">
-              <ShoppingCart className="empty-cart-icon" />
-              <p style={{ fontWeight: 600 }}>Belum ada barang di struk</p>
-              <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>
-                Ketik nama barang dan harga di atas, lalu klik <strong>Tambah Item</strong> atau tekan <kbd>Enter</kbd>.
-              </p>
-            </div>
-          ) : (
-            <div className="cart-table-wrapper">
-              <table className="cart-table">
-                <thead>
-                  <tr>
-                    <th>Barang</th>
-                    <th style={{ textAlign: 'right' }}>Harga Satuan</th>
-                    <th style={{ textAlign: 'center', width: '120px' }}>Jumlah (Qty)</th>
-                    <th style={{ textAlign: 'right' }}>Subtotal</th>
-                    <th style={{ width: '40px' }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cartItems.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>
-                          {item.name}
-                          {item.isNewProduct && (
-                            <span className="badge-new-item">
-                              <Sparkles size={10} style={{ display: 'inline', marginRight: '2px' }} /> Auto-Saved
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
-                        {formatRupiah(item.price)}
-                      </td>
-                      <td>
-                        <div className="qty-input-wrapper" style={{ height: '32px', maxWidth: '100px', margin: '0 auto' }}>
-                          <button
-                            type="button"
-                            className="qty-btn"
-                            style={{ height: '32px', width: '26px' }}
-                            onClick={() => handleUpdateCartQty(item.id, -1)}
-                          >
-                            -
-                          </button>
-                          <span style={{ flex: 1, textAlign: 'center', fontWeight: 600, fontSize: '0.9rem' }}>
-                            {item.qty}
-                          </span>
-                          <button
-                            type="button"
-                            className="qty-btn"
-                            style={{ height: '32px', width: '26px' }}
-                            onClick={() => handleUpdateCartQty(item.id, 1)}
-                          >
-                            +
-                          </button>
-                        </div>
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-                        {formatRupiah(item.subtotal)}
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-remove-item"
-                          onClick={() => handleRemoveCartItem(item.id)}
-                          title="Hapus item"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Payment & Action Card */}
-        <div className="payment-card">
-          {/* Total Ringkasan */}
-          <div className="totals-summary">
-            <span className="totals-label">TOTAL TAGIHAN</span>
-            <span className="totals-amount">{formatRupiah(totalAmount)}</span>
-          </div>
-
-          {/* Quick Cash Buttons & Input Tunai */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-              Pembayaran Tunai / Uang Diterima
-            </label>
-
-            <div className="quick-cash-row">
-              {smartCashSuggestions.map((amount, idx) => (
-                <button
-                  key={amount}
-                  type="button"
-                  className={`btn-quick-cash ${numericCash === amount ? 'active' : ''}`}
-                  onClick={() => addQuickCash(amount)}
-                  disabled={totalAmount === 0}
-                >
-                  {idx === 0 ? `Uang Pas (${formatRupiah(amount)})` : formatRupiah(amount)}
-                </button>
-              ))}
-            </div>
-
-            <div className="price-input-wrapper" style={{ marginTop: '0.25rem' }}>
-              <span className="currency-prefix">Rp</span>
-              <FormattedNumberInput
-                className={`form-input ${isInsufficientCash ? 'warning' : ''}`}
-                placeholder="Masukkan nominal uang bayar custom..."
-                value={cashAmount}
-                onChange={(val) => setCashAmount(val)}
-              />
-            </div>
-
-            {isInsufficientCash && (
-              <div
-                style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: '8px',
-                  padding: '8px 12px',
-                  color: '#b91c1c',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  marginTop: '2px',
-                }}
-              >
-                <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                <span>
-                  Uang bayar kurang {formatRupiah(totalAmount - numericCash)}. Nominal tidak boleh di bawah total tagihan.
+          {/* Card 3: Total Tagihan & Checkout Action Card */}
+          <div className="checkout-card">
+            {/* Total Ringkasan */}
+            <div className="totals-summary">
+              <div className="totals-info-left">
+                <span className="totals-label">TOTAL TAGIHAN</span>
+                <span className="totals-item-count">
+                  {cartItems.length} Jenis Barang ({totalQty} Pcs)
                 </span>
               </div>
-            )}
-          </div>
-
-          {/* Kembalian Display */}
-          {numericCash > 0 && (
-            <div className={`change-display ${changeAmount >= 0 ? 'ok' : 'lacking'}`}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {changeAmount >= 0 ? (
-                  <>
-                    <CheckCircle2 size={18} />
-                    <span>KEMBALIAN:</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle size={18} />
-                    <span>KURANG BAYAR:</span>
-                  </>
-                )}
-              </div>
-              <span style={{ fontSize: '1.25rem', fontFamily: 'var(--font-mono)' }}>
-                {formatRupiah(Math.abs(changeAmount))}
-              </span>
+              <span className="totals-amount">{formatRupiah(totalAmount)}</span>
             </div>
-          )}
 
-          {/* Optional Info Pelanggan & Catatan */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-            <input
-              type="text"
-              className="form-input"
-              style={{ fontSize: '0.85rem', height: '38px' }}
-              placeholder="Nama Pelanggan (Opsional)"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-            />
-            <input
-              type="text"
-              className="form-input"
-              style={{ fontSize: '0.85rem', height: '38px' }}
-              placeholder="Catatan struk (Opsional)"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
-
-          {/* Action Buttons: Simpan Saja (F3), Cetak Browser (F2), Reset (F4) */}
-          <div className="action-buttons-grid">
-            <button
-              type="button"
-              className="btn-primary-save-only"
-              onClick={handleSaveOnlyTransaction}
-              disabled={cartItems.length === 0 || isInsufficientCash}
-              title="Simpan transaksi kasir langsung ke database tanpa mencetak struk (F3)"
-            >
-              <Save size={18} />
-              <span>Simpan Saja<span className="btn-shortcut-tag"> (F3)</span></span>
-            </button>
-
-            <button
-              type="button"
-              className="btn-primary-print"
-              onClick={handlePrintReceipt}
-              disabled={cartItems.length === 0 || isInsufficientCash}
-              title="Simpan dan cetak struk via dialog browser / PC / USB (F2)"
-            >
-              <Printer size={18} />
-              <span>Cetak Browser<span className="btn-shortcut-tag"> (F2)</span></span>
-            </button>
-
-            <button
-              type="button"
-              className="btn-secondary-reset"
-              onClick={handleResetTransaction}
-              title="Reset transaksi kasir (F4)"
-            >
-              <RotateCcw size={16} />
-              <span>Reset<span className="btn-shortcut-tag"> (F4)</span></span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="btn-primary-bluetooth"
-            onClick={handlePrintBluetooth}
-            disabled={cartItems.length === 0 || isPrintingBt || isInsufficientCash}
-            title="Cetak langsung ke printer Bluetooth VSC MP-58M Pro via Web Bluetooth"
-          >
-            <Bluetooth size={20} className={isPrintingBt ? 'animate-spin' : ''} />
-            <div className="btn-bt-content">
-              <span className="btn-bt-title">
-                {isPrintingBt ? 'Menghubungkan Bluetooth...' : 'Cetak Bluetooth (Android / PC)'}
-              </span>
-              <span className="btn-bt-subtitle">Google Chrome (Android & PC Desktop) • VSC MP-58M</span>
-            </div>
-          </button>
-
-          <div className="direct-print-wrapper">
-            <div className="direct-print-header">
-              <Zap size={13} color="#f59e0b" />
-              <span>Opsi Tambahan (App Helper):</span>
-            </div>
-            <div className="direct-buttons-grid">
+            {/* Primary Checkout & Reset Buttons */}
+            <div className="checkout-actions-row">
               <button
                 type="button"
-                className="btn-direct-rawbt"
-                onClick={handlePrintRawBT}
-                disabled={cartItems.length === 0 || isInsufficientCash}
-                title="Buka via aplikasi RawBT (Android)"
+                className="btn-primary-checkout"
+                onClick={handleOpenPaymentModal}
+                disabled={cartItems.length === 0}
+                title="Buka menu pembayaran, input nama/catatan, dan cetak struk (F2)"
               >
-                <Smartphone size={16} />
-                <div className="btn-direct-content">
-                  <span className="btn-direct-title">RawBT App</span>
-                  <span className="btn-direct-subtitle">Android Helper</span>
-                </div>
+                <CreditCard size={20} />
+                <span>Proses Pembayaran<span className="btn-shortcut-tag"> (F2)</span></span>
+                <ArrowRight size={18} />
               </button>
+
               <button
                 type="button"
-                className="btn-direct-thermer"
-                onClick={handlePrintThermer}
-                disabled={cartItems.length === 0 || isInsufficientCash}
-                title="Buka via aplikasi Thermer (iOS / iPhone)"
+                className="btn-secondary-reset"
+                onClick={handleResetTransaction}
+                disabled={cartItems.length === 0}
+                title="Reset transaksi kasir (F4)"
               >
-                <Share2 size={16} />
-                <div className="btn-direct-content">
-                  <span className="btn-direct-title">Thermer App</span>
-                  <span className="btn-direct-subtitle">iOS / iPhone</span>
-                </div>
+                <RotateCcw size={16} />
+                <span>Reset<span className="btn-shortcut-tag"> (F4)</span></span>
               </button>
             </div>
-          </div>
 
-          {/* Mobile Preview Toggle Button */}
-          <button
-            type="button"
-            className="btn-mobile-preview-toggle"
-            onClick={() => setShowMobilePreview(!showMobilePreview)}
-          >
-            <Printer size={16} />
-            {showMobilePreview ? 'Sembunyikan Tampilan Struk' : 'Lihat Tampilan Struk (58mm)'}
-          </button>
+            {/* Mobile Preview Toggle Button */}
+            <button
+              type="button"
+              className="btn-mobile-preview-toggle"
+              onClick={() => setShowMobilePreview(!showMobilePreview)}
+            >
+              <Printer size={16} />
+              {showMobilePreview ? 'Sembunyikan Tampilan Struk' : 'Lihat Tampilan Struk (58mm)'}
+            </button>
+          </div>
+        </div>
+
+        {/* Right Column: Live Receipt Preview */}
+        <div className={`receipt-preview-panel ${!showMobilePreview ? 'mobile-hidden' : ''}`}>
+          <ReceiptPreview
+            items={cartItems}
+            total={totalAmount}
+            cash={numericCash || totalAmount}
+            change={changeAmount}
+            invoiceNo={invoiceNo}
+            date={new Date().toISOString()}
+            storeProfile={storeProfile}
+            customerName={customerName}
+            cashierName={getCurrentUser()?.name || storeProfile.cashierName}
+            notes={notes}
+          />
         </div>
       </div>
 
-      {/* Right Column: Live Receipt Preview */}
-      <div className={`receipt-preview-panel ${!showMobilePreview ? 'mobile-hidden' : ''}`}>
-        <ReceiptPreview
-          items={cartItems}
-          total={totalAmount}
-          cash={numericCash || totalAmount}
-          change={changeAmount}
-          invoiceNo={invoiceNo}
-          date={new Date().toISOString()}
-          storeProfile={storeProfile}
-          customerName={customerName}
-          cashierName={getCurrentUser()?.name || storeProfile.cashierName}
-          notes={notes}
-        />
-      </div>
-    </div>
+      {/* Modal Pembayaran & Cetak Struk */}
+      <PaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        totalAmount={totalAmount}
+        cartItems={cartItems}
+        invoiceNo={invoiceNo}
+        cashAmount={cashAmount}
+        setCashAmount={setCashAmount}
+        smartCashSuggestions={smartCashSuggestions}
+        numericCash={numericCash}
+        changeAmount={changeAmount}
+        isInsufficientCash={isInsufficientCash}
+        onSaveOnly={handleSaveOnlyTransaction}
+        onPrintBluetooth={handlePrintBluetooth}
+        isPrintingBt={isPrintingBt}
+        onPrintReceipt={handlePrintReceipt}
+        onPrintRawBT={handlePrintRawBT}
+        onPrintThermer={handlePrintThermer}
+        storeProfile={storeProfile}
+      />
+    </>
   );
 };
+
+export default KasirView;

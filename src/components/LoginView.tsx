@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Lock, Eye, EyeOff, Loader2, Globe, AlertCircle } from 'lucide-react';
-import { getUsers, setCurrentUser, setInMemoryUsers } from '../services/storageService';
-import { fetchAllUsersFromTurso } from '../services/tursoClient';
+import { User, Lock, Eye, EyeOff, Loader2, Globe, AlertCircle, WifiOff } from 'lucide-react';
+import { loginWithCredentials, classifyAuthError } from '../services/authService';
 import { UserAccount } from '../types';
 
 interface LoginViewProps {
@@ -23,7 +22,8 @@ const TRANSLATIONS = {
     loadingButton: 'Memproses...',
     usernameRequired: 'Username tidak boleh kosong',
     passwordRequired: 'Password tidak boleh kosong',
-    authFailed: 'Username atau password salah',
+    authFailed: 'Username atau password yang Anda masukkan salah.',
+    sessionDurationHint: 'Login akan tetap aktif selama 7 hari di perangkat ini.',
     hintTitle: 'Akun Tersedia:',
     hintAdmin: 'Admin: admin / admin123',
     hintKasir: 'Kasir: kasir / kasir123',
@@ -41,7 +41,8 @@ const TRANSLATIONS = {
     loadingButton: 'Signing in...',
     usernameRequired: 'Username cannot be empty',
     passwordRequired: 'Password cannot be empty',
-    authFailed: 'Invalid username or password',
+    authFailed: 'The username or password you entered is incorrect.',
+    sessionDurationHint: 'Login will stay active for 7 days on this device.',
     hintTitle: 'Available Accounts:',
     hintAdmin: 'Admin: admin / admin123',
     hintKasir: 'Cashier: kasir / kasir123',
@@ -57,6 +58,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const [usernameError, setUsernameError] = useState<string>('');
   const [passwordError, setPasswordError] = useState<string>('');
   const [generalError, setGeneralError] = useState<string>('');
+  const [errorCode, setErrorCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const usernameInputRef = useRef<HTMLInputElement>(null);
@@ -77,21 +79,24 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     if (passwordError) {
       setPasswordError(TRANSLATIONS[nextLang].passwordRequired);
     }
-    if (generalError) {
-      setGeneralError(TRANSLATIONS[nextLang].authFailed);
-    }
   };
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUsername(e.target.value);
     if (usernameError) setUsernameError('');
-    if (generalError) setGeneralError('');
+    if (generalError) {
+      setGeneralError('');
+      setErrorCode('');
+    }
   };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
     if (passwordError) setPasswordError('');
-    if (generalError) setGeneralError('');
+    if (generalError) {
+      setGeneralError('');
+      setErrorCode('');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,44 +130,27 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
     setIsLoading(true);
     setGeneralError('');
+    setErrorCode('');
 
     try {
-      const trimmedPassword = password.trim();
+      const user = await loginWithCredentials(username, password);
+      setIsLoading(false);
+      onLoginSuccess(user);
+    } catch (err: any) {
+      setIsLoading(false);
+      const classified = err?.code ? err : classifyAuthError(err);
+      setErrorCode(classified.code || 'UNKNOWN_ERROR');
 
-      // 1. Fetch fresh users directly from Turso
-      let freshUsers: UserAccount[] = [];
-      try {
-        freshUsers = await fetchAllUsersFromTurso();
-        if (freshUsers.length > 0) {
-          setInMemoryUsers(freshUsers);
-        }
-      } catch (err) {
-        console.warn('Direct Turso users fetch error:', err);
-      }
+      const message = lang === 'id'
+        ? (classified.messageId || classified.message || t.authFailed)
+        : (classified.messageEn || classified.message || t.authFailed);
 
-      // 2. Search against fresh users or in-memory fallback
-      const userPool = freshUsers.length > 0 ? freshUsers : getUsers();
-      const matched = userPool.find((u) => {
-        const uName = (u.username || '').trim().toLowerCase();
-        const uPass = (u.password || '').trim();
-        return uName === trimmedUsername && (uPass === trimmedPassword || u.password === password);
-      });
+      setGeneralError(message);
 
-      if (matched) {
-        sessionStorage.setItem('mega_teknik_auth', 'true');
-        setCurrentUser(matched);
-        setIsLoading(false);
-        onLoginSuccess(matched);
-      } else {
-        setIsLoading(false);
+      if (classified.code === 'INVALID_CREDENTIALS') {
         setPassword('');
-        setGeneralError(t.authFailed);
         passwordInputRef.current?.focus();
       }
-    } catch (err) {
-      console.error('Login error:', err);
-      setIsLoading(false);
-      setGeneralError(t.authFailed);
     }
   };
 
@@ -192,8 +180,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </div>
 
         {generalError && (
-          <div className="login-alert-banner">
-            <AlertCircle size={16} className="login-alert-icon" />
+          <div className={`login-alert-banner ${errorCode === 'NO_INTERNET' ? 'offline' : ''}`}>
+            {errorCode === 'NO_INTERNET' ? (
+              <WifiOff size={18} className="login-alert-icon" />
+            ) : (
+              <AlertCircle size={18} className="login-alert-icon" />
+            )}
             <span>{generalError}</span>
           </div>
         )}
@@ -268,6 +260,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         </form>
 
         <div className="login-footer">
+          <span style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', marginBottom: '4px' }}>
+            🔒 {t.sessionDurationHint}
+          </span>
           <span>&copy; {new Date().getFullYear()} Mega Tehnik Elektronik &bull; {t.footerText}</span>
         </div>
       </div>

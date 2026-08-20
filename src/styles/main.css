@@ -3092,6 +3092,16 @@ button,
   animation: fadeIn 0.2s ease;
 }
 
+.login-alert-banner.offline {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.login-alert-banner.offline .login-alert-icon {
+  color: #d97706;
+}
+
 .login-alert-icon {
   flex-shrink: 0;
   color: #dc2626;

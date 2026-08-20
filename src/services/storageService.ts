@@ -6,6 +6,11 @@ import {
   upsertUserToTurso,
   deleteUserFromTurso,
 } from './tursoClient';
+import {
+  createAuthSession,
+  clearAuthSession,
+  getActiveSessionUser,
+} from './authService';
 
 // Clean up legacy persistent localStorage keys immediately
 const purgeLegacyLocalStorage = () => {
@@ -392,25 +397,16 @@ export const deleteUser = (id: number | string): boolean => {
   return true;
 };
 
-// Session storage for active authentication state (resets on browser session close)
+// Session storage for active authentication state with 7-day sliding expiration
 export const getCurrentUser = (): UserAccount | null => {
-  try {
-    const raw = sessionStorage.getItem(SESSION_AUTH_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return getActiveSessionUser();
 };
 
 export const setCurrentUser = (user: UserAccount | null): void => {
-  try {
-    if (user) {
-      sessionStorage.setItem(SESSION_AUTH_KEY, JSON.stringify(user));
-    } else {
-      sessionStorage.removeItem(SESSION_AUTH_KEY);
-    }
-  } catch (err) {
-    console.error('Failed to set current user in session storage:', err);
+  if (user) {
+    createAuthSession(user);
+  } else {
+    clearAuthSession();
   }
 };
 

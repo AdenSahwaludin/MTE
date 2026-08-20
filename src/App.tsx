@@ -4,9 +4,11 @@ import {
   getProducts,
   getTransactions,
   getStoreProfile,
-  getCurrentUser,
-  setCurrentUser,
 } from './services/storageService';
+import {
+  validateAndRefreshSession,
+  clearAuthSession,
+} from './services/authService';
 import { syncService } from './services/syncService';
 import { Navbar, NavTab } from './components/Navbar';
 import { KasirView } from './components/KasirView';
@@ -29,14 +31,13 @@ interface ToastMessage {
 }
 
 export const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return (
-      (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('mega_teknik_auth') === 'true') ||
-      (typeof localStorage !== 'undefined' && localStorage.getItem('mega_teknik_auth') === 'true')
-    );
+  const [currentUser, setCurrentUserState] = useState<UserAccount | null>(() => {
+    return validateAndRefreshSession();
   });
-  const [currentUser, setCurrentUserState] = useState<UserAccount | null>(() => getCurrentUser());
-  const [showSplash, setShowSplash] = useState<boolean>(() => isAppOrPwa() && isAuthenticated);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return Boolean(validateAndRefreshSession());
+  });
+  const [showSplash, setShowSplash] = useState<boolean>(() => isAppOrPwa() && Boolean(validateAndRefreshSession()));
   const [isSplashPreview, setIsSplashPreview] = useState<boolean>(false);
   const [currentTab, setCurrentTab] = useState<NavTab>('kasir');
   const [products, setProducts] = useState<Product[]>([]);
@@ -50,6 +51,37 @@ export const App: React.FC = () => {
     setTransactions(getTransactions());
     setStoreProfile(getStoreProfile());
   }, []);
+
+  // Sliding session expiration renewal on window focus and app visibility
+  useEffect(() => {
+    const handleSlidingSessionCheck = () => {
+      const activeUser = validateAndRefreshSession();
+      if (!activeUser && isAuthenticated) {
+        setIsAuthenticated(false);
+        setCurrentUserState(null);
+        showToast('Sesi login telah berakhir (kedaluwarsa 7 hari). Silakan login kembali.', 'info');
+      } else if (activeUser) {
+        setCurrentUserState(activeUser);
+      }
+    };
+
+    window.addEventListener('focus', handleSlidingSessionCheck);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleSlidingSessionCheck();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Periodic heartbeat check every 30 minutes
+    const interval = setInterval(handleSlidingSessionCheck, 30 * 60 * 1000);
+
+    return () => {
+      window.removeEventListener('focus', handleSlidingSessionCheck);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -84,9 +116,7 @@ export const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('mega_teknik_auth');
-    localStorage.removeItem('mega_teknik_auth');
-    setCurrentUser(null);
+    clearAuthSession();
     setCurrentUserState(null);
     setIsAuthenticated(false);
     setCurrentTab('kasir');

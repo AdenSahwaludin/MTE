@@ -68,6 +68,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
     }
   };
 
+  // Direct focus for active user actions (works on both mobile and desktop)
+  const focusInput = (ref: React.RefObject<HTMLInputElement | null>) => {
+    if (typeof window === 'undefined' || !ref.current) return;
+    ref.current.focus();
+    try {
+      ref.current.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    } catch {
+      // ignore
+    }
+  };
+
   // Focus name input on mount (only on desktop to prevent mobile keyboard popups & zoom)
   useEffect(() => {
     focusInputIfDesktop(nameInputRef);
@@ -151,9 +162,9 @@ export const KasirView: React.FC<KasirViewProps> = ({
     if (andAddToCart && product.price > 0) {
       addItemToCartDirect(product, itemQty || 1);
     } else if (product.price <= 0) {
-      focusInputIfDesktop(priceInputRef);
+      focusInput(priceInputRef);
     } else {
-      focusInputIfDesktop(qtyInputRef);
+      focusInput(qtyInputRef);
     }
   };
 
@@ -161,8 +172,9 @@ export const KasirView: React.FC<KasirViewProps> = ({
     const priceNum = parseNumberFromInput(itemPrice);
     if (priceNum > 0 && itemName.trim()) {
       handleAddItem();
-    } else if (itemName.trim()) {
-      focusInputIfDesktop(priceInputRef);
+    } else {
+      // Direct focus into price input when adding new item on mobile & desktop!
+      focusInput(priceInputRef);
     }
   };
 
@@ -173,14 +185,14 @@ export const KasirView: React.FC<KasirViewProps> = ({
     const trimmedName = itemName.trim();
     if (!trimmedName) {
       showToast('Mohon masukkan nama barang', 'info');
-      focusInputIfDesktop(nameInputRef);
+      focusInput(nameInputRef);
       return;
     }
 
     const priceNum = parseNumberFromInput(itemPrice);
     if (priceNum <= 0) {
       showToast('Harga satuan barang tidak boleh Rp 0. Silakan masukkan harga barang.', 'info');
-      focusInputIfDesktop(priceInputRef);
+      focusInput(priceInputRef);
       return;
     }
 

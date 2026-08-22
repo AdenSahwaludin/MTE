@@ -272,7 +272,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       prev
         .map((item) => {
           if (item.id === id) {
-            const newQty = Math.max(1, item.qty + delta);
+            const newQty = item.qty + delta;
             return {
               ...item,
               qty: newQty,

@@ -1,19 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { Product } from '../types';
 import { deleteProduct, exportDataJSON, importDataJSON } from '../services/storageService';
-import { formatRupiah, formatDateIndo } from '../utils/formatters';
+import { formatRupiah } from '../utils/formatters';
 import { ProductModal } from './ProductModal';
+import { ProductDetailModal } from './ProductDetailModal';
 import {
   Package,
   Plus,
   Search,
   Edit2,
   Trash2,
-  Tag,
+  Info,
   Download,
   Upload,
   Layers,
-  AlertTriangle,
+  Tag,
 } from 'lucide-react';
 
 interface ProductListViewProps {
@@ -31,6 +32,8 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
 
   // Extract unique categories from actual products in DB
   const categories = useMemo(() => {
@@ -43,13 +46,14 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
     return Array.from(set).sort();
   }, [products]);
 
-  // Filter products based on search query (matching name OR aliases) and category
+  // Filter products based on search query (matching name, aliases, category, or ID) and category
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
         p.name.toLowerCase().includes(q) ||
+        (p.id && p.id.toLowerCase().includes(q)) ||
         (p.aliases && p.aliases.some((alias) => alias.toLowerCase().includes(q))) ||
         (p.category && p.category.toLowerCase().includes(q));
 
@@ -70,11 +74,20 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
     setModalOpen(true);
   };
 
+  const handleOpenDetailModal = (p: Product) => {
+    setViewingProduct(p);
+    setDetailModalOpen(true);
+  };
+
   const handleDelete = (id: string, name: string) => {
     if (window.confirm(`Apakah Anda yakin ingin menghapus produk "${name}"?`)) {
       deleteProduct(id);
       onRefresh();
       showToast(`Produk "${name}" telah dihapus`, 'info');
+      if (viewingProduct?.id === id) {
+        setDetailModalOpen(false);
+        setViewingProduct(null);
+      }
     }
   };
 
@@ -124,7 +137,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
             Daftar Produk ({products.length} Barang)
           </h2>
           <p>
-            Kelola nama produk, daftar nama lain / alias untuk pencarian kasir, dan harga satuan.
+            Kelola master data produk, harga satuan, kategori, dan detail alias untuk kasir.
           </p>
         </div>
 
@@ -154,7 +167,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
           <input
             type="text"
             className="form-input"
-            placeholder="Cari berdasarkan nama produk atau nama lain/alias..."
+            placeholder="Cari nama produk, nama lain/alias, kategori, atau ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -197,49 +210,43 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
             <table className="cart-table">
               <thead>
                 <tr>
-                  <th style={{ width: '30%' }}>Nama Produk</th>
-                  <th style={{ width: '35%' }}>Nama Lain / Alias (Pencarian Cepat)</th>
-                  <th style={{ width: '15%' }}>Kategori / Satuan</th>
-                  <th style={{ width: '12%', textAlign: 'right' }}>Harga Satuan</th>
-                  <th style={{ width: '8%', textAlign: 'center' }}>Aksi</th>
+                  <th style={{ width: '42%' }}>Nama Produk</th>
+                  <th style={{ width: '20%' }}>Kategori</th>
+                  <th style={{ width: '12%' }}>Satuan</th>
+                  <th style={{ width: '14%', textAlign: 'right' }}>Harga Satuan</th>
+                  <th style={{ width: '12%', textAlign: 'center' }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredProducts.map((p) => (
                   <tr key={p.id}>
                     <td>
-                      <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{p.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px' }}>
-                        ID: <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#64748b' }}>{p.id}</span>
-                        {p.createdBy && (
-                          <span style={{ marginLeft: '6px', color: '#0284c7', background: '#f0f9ff', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bae6fd' }}>
-                            Oleh: {p.createdBy}
+                      <div
+                        className="product-name-cell"
+                        onClick={() => handleOpenDetailModal(p)}
+                        title="Klik untuk melihat detail produk"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <span className="product-table-name">{p.name}</span>
+                        {p.aliases && p.aliases.length > 0 && (
+                          <span
+                            className="alias-count-indicator"
+                            title={`${p.aliases.length} nama lain / alias terdaftar`}
+                          >
+                            <Tag size={10} style={{ marginRight: '2px' }} />
+                            {p.aliases.length} Alias
                           </span>
                         )}
                       </div>
                     </td>
                     <td>
-                      {p.aliases && p.aliases.length > 0 ? (
-                        <div className="aliases-badge-container">
-                          {p.aliases.map((alias, aIdx) => (
-                            <span key={aIdx} className="alias-pill">
-                              <Tag size={10} style={{ display: 'inline', marginRight: '3px' }} />
-                              {alias}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                          (Belum ada nama lain)
-                        </span>
-                      )}
+                      <span className={p.category ? 'category-table-badge' : 'category-empty-text'}>
+                        {p.category ? p.category : '-'}
+                      </span>
                     </td>
                     <td>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 500, color: p.category ? 'var(--text-main)' : '#94a3b8' }}>
-                        {p.category ? p.category : '-'}
-                      </div>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        Satuan: {p.unit || 'Pcs'}
+                      <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: 500 }}>
+                        {p.unit || 'Pcs'}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
@@ -247,6 +254,14 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
                     </td>
                     <td>
                       <div className="product-action-btns" style={{ justifyContent: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn-icon-action detail"
+                          onClick={() => handleOpenDetailModal(p)}
+                          title="Lihat Detail Produk (ID, Pembuat, Alias)"
+                        >
+                          <Info size={15} />
+                        </button>
                         <button
                           type="button"
                           className="btn-icon-action"
@@ -272,6 +287,23 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal Detail Produk */}
+      <ProductDetailModal
+        isOpen={detailModalOpen}
+        product={viewingProduct}
+        onClose={() => {
+          setDetailModalOpen(false);
+          setViewingProduct(null);
+        }}
+        onEdit={(p) => {
+          handleOpenEditModal(p);
+        }}
+        onDelete={(id, name) => {
+          handleDelete(id, name);
+        }}
+        showToast={showToast}
+      />
 
       {/* Modal Tambah / Edit */}
       <ProductModal

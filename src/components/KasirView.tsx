@@ -9,6 +9,11 @@ import {
 } from '../services/storageService';
 import { printViaRawBT, printViaThermer } from '../services/directPrintService';
 import { printDirectBluetooth } from '../services/bluetoothPrintService';
+import {
+  isNativePrinterAvailable,
+  printNativeDirect,
+  openRawBTNative,
+} from '../services/nativePrintService';
 import { AutocompleteInput } from './AutocompleteInput';
 import { FormattedNumberInput } from './FormattedNumberInput';
 import { ReceiptPreview } from './ReceiptPreview';
@@ -422,13 +427,30 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
     try {
       setIsPrintingBt(true);
+
+      // 1. Kalau di APK native -> print LANGSUNG via Bluetooth Classic SPP
+      if (isNativePrinterAvailable()) {
+        showToast('Mencetak langsung ke printer Bluetooth...', 'info');
+        const result = await printNativeDirect(trx, storeProfile);
+        showToast(`Struk tercetak via ${result.address}!`, 'success');
+        handleResetTransaction();
+        return;
+      }
+
+      // 2. Kalau di Chrome / PWA -> Web Bluetooth (BLE)
       showToast('Menghubungkan ke printer Bluetooth (VSC MP-58M Pro)...', 'info');
       await printDirectBluetooth(trx, storeProfile);
       showToast('Struk berhasil dicetak ke printer Bluetooth!', 'success');
       handleResetTransaction();
     } catch (err: any) {
       console.error('Bluetooth print error:', err);
-      showToast(err?.message || 'Gagal koneksi Bluetooth. Pastikan Bluetooth aktif dan pilih printer.', 'info');
+      const msg: string = err?.message || 'Gagal koneksi Bluetooth.';
+      // Pesan khusus kalau Web Bluetooth tidak didukung (artinya lagi di APK lama / WebView)
+      if (msg.includes('tidak mendukung Web Bluetooth') || msg.includes('GATT')) {
+        showToast('Web Bluetooth tidak didukung di APK ini. Rebuild APK terbaru untuk print langsung, atau pakai tombol RawBT.', 'info');
+      } else {
+        showToast(msg + ' Pastikan printer nyala & sudah di-pairing.', 'info');
+      }
     } finally {
       setIsPrintingBt(false);
     }
@@ -444,10 +466,23 @@ export const KasirView: React.FC<KasirViewProps> = ({
     handleResetTransaction();
   };
 
-  // 4. Direct RawBT Print (Android Companion App)
-  const handlePrintRawBT = () => {
+  // 4. Direct RawBT Print (Android Companion App / Native Intent di APK)
+  const handlePrintRawBT = async () => {
     const trx = createCurrentTransaction();
     if (!trx) return;
+
+    // Di APK baru: kirim via intent native (tidak diblokir WebView)
+    if (isNativePrinterAvailable()) {
+      try {
+        showToast('Membuka RawBT...', 'success');
+        await openRawBTNative(trx, storeProfile);
+        handleResetTransaction();
+        return;
+      } catch (err: any) {
+        showToast(err?.message || 'Gagal buka RawBT. Pastikan aplikasi RawBT terinstall.', 'info');
+        return;
+      }
+    }
 
     showToast('Mengirim data ke RawBT Android (POS-58)...', 'success');
     printViaRawBT(trx, storeProfile);

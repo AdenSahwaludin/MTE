@@ -12,6 +12,13 @@ import {
 import { syncService, SyncInfo } from '../services/syncService';
 import { testTursoConnection, getTursoConfig } from '../services/tursoClient';
 import {
+  isNativePrinterAvailable,
+  listPairedPrinters,
+  getSavedPrinterAddress,
+  savePrinterAddress,
+  PairedPrinter,
+} from '../services/nativePrintService';
+import {
   Settings,
   Store,
   Printer,
@@ -83,6 +90,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const loggedUser = getCurrentUser();
   const tursoConfig = getTursoConfig();
+
+  const [printers, setPrinters] = useState<PairedPrinter[]>([]);
+  const [savedPrinter, setSavedPrinter] = useState<string>(() => getSavedPrinterAddress());
+  const [isScanningPrinter, setIsScanningPrinter] = useState(false);
+  const isNativePrinter = isNativePrinterAvailable();
+
+  const handleScanPrinters = async () => {
+    setIsScanningPrinter(true);
+    try {
+      const list = await listPairedPrinters();
+      setPrinters(list);
+      if (list.length === 0) {
+        showToast('Belum ada printer ter-pairing. Pairing dulu di Pengaturan Bluetooth HP.', 'info');
+      } else {
+        showToast(`Ketemu ${list.length} perangkat Bluetooth.`, 'success');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal scan printer.', 'info');
+    } finally {
+      setIsScanningPrinter(false);
+    }
+  };
+
+  const handleSelectPrinter = (address: string) => {
+    savePrinterAddress(address);
+    setSavedPrinter(address);
+    showToast('Printer default tersimpan!', 'success');
+  };
 
   useEffect(() => {
     const unsub = syncService.subscribe((info) => {
@@ -335,6 +370,46 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Printer size={18} color="#2563eb" /> Format Struk & Printer Thermal
             </h3>
+
+            <div className="form-group" style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', padding: '12px' }}>
+              <label style={{ fontWeight: 700 }}>Printer Bluetooth (APK Langsung, 58mm)</label>
+              {!isNativePrinter ? (
+                <p style={{ fontSize: '0.82rem', color: '#475569', margin: '6px 0 0 0' }}>
+                  Mode browser: pakai tombol RawBT / Bluetooth di menu Kasir. Install APK terbaru untuk print langsung tanpa aplikasi tambahan.
+                </p>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.82rem', color: '#0369a1', margin: '6px 0 10px 0' }}>
+                    Pairing dulu printer VSC MP-58M di Bluetooth HP, lalu pilih di bawah. Sekali pilih, tombol Biru di Kasir langsung cetak.
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                    <button type="button" className="btn-outline" onClick={handleScanPrinters} disabled={isScanningPrinter} style={{ fontSize: '0.82rem' }}>
+                      {isScanningPrinter ? 'Mencari...' : 'Cari Printer Ter-pairing'}
+                    </button>
+                    {savedPrinter && (
+                      <span style={{ fontSize: '0.78rem', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '999px', fontWeight: 700 }}>
+                        Tersimpan: {savedPrinter}
+                      </span>
+                    )}
+                  </div>
+                  {printers.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {printers.map((p) => (
+                        <label key={p.address} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', background: '#fff', border: savedPrinter === p.address ? '2px solid #22c55e' : '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="default-printer"
+                            checked={savedPrinter === p.address}
+                            onChange={() => handleSelectPrinter(p.address)}
+                          />
+                          <span><strong>{p.name || 'Printer'}</strong> <span style={{ color: '#64748b', fontFamily: 'monospace' }}>{p.address}</span></span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
 
             <div className="form-group">
               <label>Ukuran Kertas Printer Thermal</label>

@@ -3,6 +3,11 @@ import { Transaction, StoreProfile } from '../types';
 import { deleteTransaction } from '../services/storageService';
 import { printViaRawBT, printViaThermer } from '../services/directPrintService';
 import { printDirectBluetooth } from '../services/bluetoothPrintService';
+import {
+  isNativePrinterAvailable,
+  printNativeDirect,
+  openRawBTNative,
+} from '../services/nativePrintService';
 import { formatRupiah, formatDateIndo } from '../utils/formatters';
 import {
   History,
@@ -57,12 +62,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   const handleReprintBluetooth = async (t: Transaction) => {
     try {
       setIsPrintingBtId(t.id);
+      if (isNativePrinterAvailable()) {
+        showToast(`Mencetak langsung ${t.invoiceNo}...`, 'info');
+        await printNativeDirect(t, storeProfile);
+        showToast(`Berhasil mencetak struk ${t.invoiceNo}!`, 'success');
+        return;
+      }
       showToast(`Menghubungkan ke printer Bluetooth (${t.invoiceNo})...`, 'info');
       await printDirectBluetooth(t, storeProfile);
       showToast(`Berhasil mencetak struk ${t.invoiceNo} ke printer Bluetooth!`, 'success');
     } catch (err: any) {
       console.error('Bluetooth reprint error:', err);
-      showToast(err?.message || 'Gagal koneksi Bluetooth. Pastikan Bluetooth aktif dan pilih printer.', 'info');
+      showToast((err?.message || 'Gagal koneksi Bluetooth.') + ' Pastikan printer nyala & sudah di-pairing.', 'info');
     } finally {
       setIsPrintingBtId(null);
     }
@@ -73,7 +84,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     onPrintReceipt(t);
   };
 
-  const handleReprintRawBT = (t: Transaction) => {
+  const handleReprintRawBT = async (t: Transaction) => {
+    if (isNativePrinterAvailable()) {
+      try {
+        showToast(`Mengirim ulang ke RawBT (${t.invoiceNo})...`, 'success');
+        await openRawBTNative(t, storeProfile);
+        return;
+      } catch (err: any) {
+        showToast(err?.message || 'Gagal buka RawBT.', 'info');
+        return;
+      }
+    }
     showToast(`Mengirim ulang ke RawBT Android (${t.invoiceNo})...`, 'success');
     printViaRawBT(t, storeProfile);
   };

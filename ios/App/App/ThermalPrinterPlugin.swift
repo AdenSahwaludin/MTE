@@ -21,7 +21,7 @@ import UIKit
  * - openRawBT = share sheet berisi teks struk (RawBT hanya ada di Android).
  */
 @objc(ThermalPrinterPlugin)
-public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
+public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDelegate, CBPeripheralDelegate {
     public let identifier = "ThermalPrinterPlugin"
     public let jsName = "ThermalPrinter"
 

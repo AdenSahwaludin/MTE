@@ -578,16 +578,18 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     // MARK: - CBCentralManagerDelegate (callback masuk di bleQueue)
+    // @objc wajib eksplisit: Swift tidak meng-infers-nya untuk witness
+    // protocol @objc (CBCentralManagerDelegate / CBPeripheralDelegate).
 
-    public func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        stateWaiter.succeed(central.state)
+    @objc public func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        stateWaiter?.succeed(central.state)
         if central.state != .poweredOn {
             failAllWaiters(PrinterError.btState(central.state))
             teardownConnection()
         }
     }
 
-    public func centralManager(
+    @objc public func centralManager(
         _ central: CBCentralManager,
         didDiscover peripheral: CBPeripheral,
         advertisementData: [String: Any],
@@ -599,14 +601,14 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         scannedNames[peripheral.identifier] = name
     }
 
-    public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+    @objc public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         connectedPeripheral = peripheral
         connectedAddress = peripheral.identifier.uuidString
         peripheral.delegate = self
-        connectWaiter.succeed(())
+        connectWaiter?.succeed(())
     }
 
-    public func centralManager(
+    @objc public func centralManager(
         _ central: CBCentralManager,
         didFailToConnect peripheral: CBPeripheral,
         error: Error?
@@ -614,10 +616,10 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         connectedPeripheral = nil
         connectedAddress = nil
         let message = error.map { $0.localizedDescription } ?? "koneksi ditolak printer"
-        connectWaiter.fail(PrinterError.writeFailed(message))
+        connectWaiter?.fail(PrinterError.writeFailed(message))
     }
 
-    public func centralManager(
+    @objc public func centralManager(
         _ central: CBCentralManager,
         didDisconnectPeripheral peripheral: CBPeripheral,
         error: Error?
@@ -631,21 +633,21 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
 
     // MARK: - CBPeripheralDelegate
 
-    public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+    @objc public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         if let error {
-            servicesWaiter.fail(PrinterError.writeFailed(error.localizedDescription))
+            servicesWaiter?.fail(PrinterError.writeFailed(error.localizedDescription))
             return
         }
         let services = peripheral.services ?? []
         guard !services.isEmpty else {
-            servicesWaiter.fail(PrinterError.noWritableCharacteristic)
+            servicesWaiter?.fail(PrinterError.noWritableCharacteristic)
             return
         }
         foundServices = services
-        servicesWaiter.succeed(())
+        servicesWaiter?.succeed(())
     }
 
-    public func peripheral(
+    @objc public func peripheral(
         _ peripheral: CBPeripheral,
         didDiscoverCharacteristicsFor service: CBService,
         error: Error?
@@ -653,28 +655,28 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         // Abaikan callback terlambat dari service yang sudah lewat timeout-nya
         guard charsWaiterService === service else { return }
         if let error {
-            charsWaiter.fail(PrinterError.writeFailed(error.localizedDescription))
+            charsWaiter?.fail(PrinterError.writeFailed(error.localizedDescription))
             return
         }
-        charsWaiter.succeed(())
+        charsWaiter?.succeed(())
     }
 
-    public func peripheral(
+    @objc public func peripheral(
         _ peripheral: CBPeripheral,
         didWriteValueFor characteristic: CBCharacteristic,
         error: Error?
     ) {
         if let error {
-            writeWaiter.fail(PrinterError.writeFailed(error.localizedDescription))
+            writeWaiter?.fail(PrinterError.writeFailed(error.localizedDescription))
             return
         }
-        writeWaiter.succeed(())
+        writeWaiter?.succeed(())
     }
 
-    public func peripheral(
+    @objc public func peripheral(
         _ peripheral: CBPeripheral,
         peripheralIsReady toSendWriteWithoutResponse: CBCharacteristic
     ) {
-        readyWaiter.succeed(())
+        readyWaiter?.succeed(())
     }
 }

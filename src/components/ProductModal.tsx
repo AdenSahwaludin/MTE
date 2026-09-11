@@ -171,9 +171,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   value={currentAliasInput}
                   onChange={(e) => {
                     if (e.target.value.includes(',')) {
-                      const parts = e.target.value.split(',');
-                      if (parts[0].trim()) {
-                        setAliases((prev) => Array.from(new Set([...prev, parts[0].trim()])));
+                      // Pecah SEMUA bagian koma (sebelumnya hanya parts[0], sisanya hilang)
+                      const parts = e.target.value.split(',').map((s) => s.trim()).filter(Boolean);
+                      if (parts.length > 0) {
+                        setAliases((prev) => Array.from(new Set([...prev, ...parts])));
                       }
                       setCurrentAliasInput('');
                     } else {

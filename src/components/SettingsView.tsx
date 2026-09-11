@@ -91,6 +91,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const loggedUser = getCurrentUser();
   const tursoConfig = getTursoConfig();
 
+  // Tandai form kotor agar sync background tidak menimpa ketikan user.
+  const [isProfileDirty, setIsProfileDirty] = useState(false);
+  const updateProfile = (patch: Partial<StoreProfile>) => {
+    setIsProfileDirty(true);
+    setProfile((prev) => ({ ...prev, ...patch }));
+  };
+
+  // Ikuti perubahan profil dari server KECUALI user sedang mengetik.
+  useEffect(() => {
+    if (isProfileDirty) return;
+    setProfile({
+      ...storeProfile,
+      address: storeProfile.address || 'Blok Gebangmampang, Desa Margamulya, Kec. Bongas',
+      phone: storeProfile.phone || '0852-2429-7545',
+    });
+  }, [storeProfile, isProfileDirty]);
+
   const [printers, setPrinters] = useState<PairedPrinter[]>([]);
   const [savedPrinter, setSavedPrinter] = useState<string>(() => getSavedPrinterAddress());
   const [isScanningPrinter, setIsScanningPrinter] = useState(false);
@@ -102,9 +119,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       const list = await listPairedPrinters();
       setPrinters(list);
       if (list.length === 0) {
-        showToast('Belum ada printer ter-pairing. Pairing dulu di Pengaturan Bluetooth HP.', 'info');
+        showToast('Tidak ada printer ketemu. Nyalakan printer + Bluetooth HP, lalu Scan Printer lagi.', 'info');
       } else {
-        showToast(`Ketemu ${list.length} perangkat Bluetooth.`, 'success');
+        showToast(`Ketemu ${list.length} perangkat Bluetooth — pilih yang namanya printer.`, 'success');
       }
     } catch (err: any) {
       showToast(err?.message || 'Gagal scan printer.', 'info');
@@ -123,7 +140,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const unsub = syncService.subscribe((info) => {
       setSyncInfo(info);
     });
-    return () => unsub();
+    // Refresh daftar user + profil saat ada data baru dari cloud (heartbeat/sync).
+    const unsubRefresh = syncService.onDataRefresh(() => {
+      setUsersList(getUsers());
+    });
+    return () => {
+      unsub();
+      unsubRefresh();
+    };
   }, []);
 
   const handleTestConnection = async () => {
@@ -149,6 +173,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (res.success) {
         showToast('Sinkronisasi dengan Turso Cloud berhasil!', 'success');
         onDataReset();
+        setUsersList(getUsers());
+        setIsProfileDirty(false);
       } else {
         showToast(`Sinkronisasi gagal: ${res.message}`, 'info');
       }
@@ -195,6 +221,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     e.preventDefault();
     saveStoreProfile(profile);
     onUpdateProfile(profile);
+    setIsProfileDirty(false);
     showToast('Pengaturan toko & printer berhasil disimpan!', 'success');
   };
 
@@ -266,7 +293,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return;
     }
 
-    addOrUpdateUser(userFormData, editingUserId || undefined);
+    try {
+      addOrUpdateUser(userFormData, editingUserId || undefined);
+    } catch (err: any) {
+      showToast(err?.messageId || err?.messageEn || 'Anda tidak memiliki izin untuk mengelola pengguna.', 'info');
+      return;
+    }
     setUsersList(getUsers());
     setShowUserModal(false);
     showToast(`Pengguna "${userFormData.name}" berhasil disimpan!`, 'success');
@@ -316,7 +348,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="text"
                 className="form-input"
                 value={profile.name}
-                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                onChange={(e) => updateProfile({ name: e.target.value })}
                 required
               />
             </div>
@@ -327,7 +359,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="text"
                 className="form-input"
                 value={profile.tagline}
-                onChange={(e) => setProfile({ ...profile, tagline: e.target.value })}
+                onChange={(e) => updateProfile({ tagline: e.target.value })}
                 placeholder="Contoh: Solusi Elektronik, Terpercaya!"
               />
             </div>
@@ -338,7 +370,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="text"
                 className="form-input"
                 value={profile.address}
-                onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                onChange={(e) => updateProfile({ address: e.target.value })}
                 placeholder="Contoh: Blok Gebangmampang, Desa Margamulya, Kec. Bongas"
               />
             </div>
@@ -349,7 +381,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="text"
                 className="form-input"
                 value={profile.phone}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                onChange={(e) => updateProfile({ phone: e.target.value })}
                 placeholder="Contoh: 0852-2429-7545"
               />
             </div>
@@ -360,7 +392,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="text"
                 className="form-input"
                 value={profile.cashierName}
-                onChange={(e) => setProfile({ ...profile, cashierName: e.target.value })}
+                onChange={(e) => updateProfile({ cashierName: e.target.value })}
                 placeholder="Contoh: Kasir 01"
               />
             </div>
@@ -420,7 +452,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     name="paperSize"
                     value="58mm"
                     checked={profile.paperSize === '58mm'}
-                    onChange={() => setProfile({ ...profile, paperSize: '58mm' })}
+                    onChange={() => updateProfile({ paperSize: '58mm' })}
                   />
                   <div className="paper-option-content">
                     <div className="paper-size-badge">58 MM</div>
@@ -439,7 +471,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="form-input"
                 style={{ height: '80px', resize: 'vertical' }}
                 value={profile.footerNote}
-                onChange={(e) => setProfile({ ...profile, footerNote: e.target.value })}
+                onChange={(e) => updateProfile({ footerNote: e.target.value })}
                 placeholder="Contoh: Terima Kasih Atas Kunjungan Anda"
               />
             </div>
@@ -449,7 +481,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <input
                   type="checkbox"
                   checked={profile.autoSaveProducts}
-                  onChange={(e) => setProfile({ ...profile, autoSaveProducts: e.target.checked })}
+                  onChange={(e) => updateProfile({ autoSaveProducts: e.target.checked })}
                 />
                 <strong>Auto-Save Produk Baru</strong> (Otomatis simpan barang & harga saat diketik di kasir)
               </label>
@@ -458,7 +490,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <input
                   type="checkbox"
                   checked={profile.showDateTime}
-                  onChange={(e) => setProfile({ ...profile, showDateTime: e.target.checked })}
+                  onChange={(e) => updateProfile({ showDateTime: e.target.checked })}
                 />
                 Tampilkan Tanggal & Waktu di Struk
               </label>
@@ -467,7 +499,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <input
                   type="checkbox"
                   checked={profile.showCashierName}
-                  onChange={(e) => setProfile({ ...profile, showCashierName: e.target.checked })}
+                  onChange={(e) => updateProfile({ showCashierName: e.target.checked })}
                 />
                 Tampilkan Nama Kasir di Struk
               </label>

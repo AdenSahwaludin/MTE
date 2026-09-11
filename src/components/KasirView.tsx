@@ -5,6 +5,8 @@ import {
   addOrUpdateProduct,
   saveTransaction,
   generateInvoiceNumber,
+  generateTransactionId,
+  generateCartItemId,
   getCurrentUser,
 } from '../services/storageService';
 import { printViaRawBT, printViaThermer } from '../services/directPrintService';
@@ -14,6 +16,7 @@ import {
   printNativeDirect,
   openRawBTNative,
 } from '../services/nativePrintService';
+import { syncService } from '../services/syncService';
 import { AutocompleteInput } from './AutocompleteInput';
 import { FormattedNumberInput } from './FormattedNumberInput';
 import { ReceiptPreview } from './ReceiptPreview';
@@ -89,24 +92,49 @@ export const KasirView: React.FC<KasirViewProps> = ({
     focusInputIfDesktop(nameInputRef);
   }, []);
 
+  // Nomor struk bisa basi bila sync/heartbeat menarik transaksi device lain
+  // selagi kasir membuka halaman. Regenerasi saat data refresh TAPI hanya
+  // bila keranjang kosong (jangan ubah nomor struk yang sedang diketik).
+  const cartEmptyRef = useRef(true);
+  cartEmptyRef.current = cartItems.length === 0;
+  useEffect(() => {
+    const unsub = syncService.onDataRefresh(() => {
+      if (cartEmptyRef.current) {
+        setInvoiceNo(generateInvoiceNumber());
+      }
+    });
+    return () => unsub();
+  }, []);
+
   // Calculate Total & Change
   const totalAmount = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
   const numericCash = parseNumberFromInput(cashAmount);
   const changeAmount = numericCash - totalAmount;
 
-  // Keyboard shortcut handlers (F2 = Open Modal / Print, F3 = Save, F4 = Reset)
+  // Guard anti-duplikat: cegah double-save akibat double keydown listener
+  // (KasirView + PaymentModal), double-click, atau key-repeat.
+  // saveTransaction sendiri juga idempotent per id (lihat storageService).
+  const processingTxRef = useRef(false);
+  const tryBeginTx = (): boolean => {
+    if (processingTxRef.current) return false;
+    processingTxRef.current = true;
+    return true;
+  };
+  const endTxSoon = () => {
+    setTimeout(() => {
+      processingTxRef.current = false;
+    }, 800);
+  };
+
+  // Keyboard shortcut global (F2 = Buka Bayar, F4 = Reset).
+  // F3 (Simpan) sengaja TIDAK ditangani di sini saat modal terbuka —
+  // ditangani PaymentModal agar tidak double-fire 2 listener.
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
+        if (isPaymentModalOpen) return; // biarkan PaymentModal yang handle
         e.preventDefault();
-        if (!isPaymentModalOpen) {
-          handleOpenPaymentModal();
-        }
-      } else if (e.key === 'F3') {
-        e.preventDefault();
-        if (isPaymentModalOpen) {
-          handleSaveOnlyTransaction();
-        }
+        handleOpenPaymentModal();
       } else if (e.key === 'F4') {
         e.preventDefault();
         handleResetTransaction();
@@ -114,7 +142,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  });
+  }, [isPaymentModalOpen]);
 
   // Add item directly to cart from autocomplete suggestion on Enter
   const addItemToCartDirect = (prod: Product, qty: number = 1) => {
@@ -138,7 +166,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       setCartItems(updatedCart);
     } else {
       const newItem: CartItem = {
-        id: 'cart-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        id: generateCartItemId(),
         productId: prod.id,
         name: prod.name.trim(),
         price: priceNum,
@@ -252,7 +280,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     } else {
       // Insert new cart item
       const newItem: CartItem = {
-        id: 'cart-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        id: generateCartItemId(),
         productId: finalProductId,
         name: trimmedName,
         price: priceNum,
@@ -388,7 +416,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     const activeUser = getCurrentUser();
 
     const transactionData: Transaction = {
-      id: 'trx-' + Date.now(),
+      id: generateTransactionId(),
       invoiceNo,
       date: new Date().toISOString(),
       items: [...cartItems],
@@ -411,19 +439,28 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
   // 1. Save Transaction ONLY (No Printing dialog triggered)
   const handleSaveOnlyTransaction = () => {
-    const trx = createCurrentTransaction();
-    if (!trx) return;
+    if (!tryBeginTx()) return;
+    try {
+      const trx = createCurrentTransaction();
+      if (!trx) return;
 
-    showToast(`Transaksi ${trx.invoiceNo} berhasil disimpan ke database!`, 'success');
-    handleResetTransaction();
+      showToast(`Transaksi ${trx.invoiceNo} berhasil disimpan ke database!`, 'success');
+      handleResetTransaction();
+    } finally {
+      endTxSoon();
+    }
   };
 
   // 2. Direct Web Bluetooth Print (Android Chrome / PC Web Bluetooth - No 3rd party app needed!)
   const [isPrintingBt, setIsPrintingBt] = useState(false);
 
   const handlePrintBluetooth = async () => {
+    if (!tryBeginTx()) return;
     const trx = createCurrentTransaction();
-    if (!trx) return;
+    if (!trx) {
+      endTxSoon();
+      return;
+    }
 
     try {
       setIsPrintingBt(true);
@@ -444,59 +481,92 @@ export const KasirView: React.FC<KasirViewProps> = ({
       handleResetTransaction();
     } catch (err: any) {
       console.error('Bluetooth print error:', err);
+      // Transaksi SUDAH tersimpan (createCurrentTransaction menyimpan sebelum cetak).
+      // Keranjang wajib direset: kalau dibiarkan, tombol cetak yang ditekan lagi
+      // membuat transaksi BARU dengan item yang sama (duplikat omzet).
+      // Cetak ulang struk yang benar cukup lewat menu Riwayat (transaksi terbaru).
+      handleResetTransaction();
       const msg: string = err?.message || 'Gagal koneksi Bluetooth.';
       // Pesan khusus kalau Web Bluetooth tidak didukung (artinya lagi di APK lama / WebView)
       if (msg.includes('tidak mendukung Web Bluetooth') || msg.includes('GATT')) {
-        showToast('Web Bluetooth tidak didukung di APK ini. Rebuild APK terbaru untuk print langsung, atau pakai tombol RawBT.', 'info');
+        showToast(`Transaksi ${trx.invoiceNo} sudah tersimpan. Web Bluetooth tidak didukung di sini — pakai RawBT (Android) / Thermer (iOS), atau cetak ulang dari Riwayat.`, 'info');
       } else {
-        showToast(msg + ' Pastikan printer nyala & sudah di-pairing.', 'info');
+        showToast(`Transaksi ${trx.invoiceNo} sudah tersimpan. Cetak gagal: ${msg} Periksa printer, lalu cetak ulang dari Riwayat.`, 'info');
       }
     } finally {
       setIsPrintingBt(false);
+      endTxSoon();
     }
   };
 
   // 3. Standard Browser Print (PC / Desktop / USB)
   const handlePrintReceipt = () => {
-    const trx = createCurrentTransaction();
-    if (!trx) return;
+    if (!tryBeginTx()) return;
+    try {
+      const trx = createCurrentTransaction();
+      if (!trx) return;
 
-    showToast('Memproses cetak struk browser...', 'success');
-    onPrintReceipt(trx);
-    handleResetTransaction();
+      showToast('Memproses cetak struk browser...', 'success');
+      onPrintReceipt(trx);
+      handleResetTransaction();
+    } finally {
+      endTxSoon();
+    }
   };
 
   // 4. Direct RawBT Print (Android Companion App / Native Intent di APK)
   const handlePrintRawBT = async () => {
-    const trx = createCurrentTransaction();
-    if (!trx) return;
+    if (!tryBeginTx()) return;
+    try {
+      const trx = createCurrentTransaction();
+      if (!trx) return;
 
-    // Di APK baru: kirim via intent native (tidak diblokir WebView)
-    if (isNativePrinterAvailable()) {
-      try {
-        showToast('Membuka RawBT...', 'success');
-        await openRawBTNative(trx, storeProfile);
-        handleResetTransaction();
-        return;
-      } catch (err: any) {
-        showToast(err?.message || 'Gagal buka RawBT. Pastikan aplikasi RawBT terinstall.', 'info');
-        return;
+      // Di APK baru: kirim via intent native (tidak diblokir WebView)
+      if (isNativePrinterAvailable()) {
+        try {
+          showToast('Membuka RawBT...', 'success');
+          await openRawBTNative(trx, storeProfile);
+          handleResetTransaction();
+          return;
+        } catch (err: any) {
+          // Transaksi sudah tersimpan — reset keranjang agar retry tidak
+          // membuat transaksi dobel. Cetak ulang lewat Riwayat.
+          handleResetTransaction();
+          showToast(`Transaksi ${trx.invoiceNo} sudah tersimpan. ${err?.message || 'Gagal buka RawBT. Pastikan aplikasi RawBT terinstall.'} Cetak ulang dari Riwayat.`, 'info');
+          return;
+        }
       }
-    }
 
-    showToast('Mengirim data ke RawBT Android (POS-58)...', 'success');
-    printViaRawBT(trx, storeProfile);
-    handleResetTransaction();
+      // URL intent tidak bisa dikonfirmasi dari web (RawBT fire-and-forget) —
+      // toast dibuat jujur + arahan, bukan klaim sukses.
+      showToast('Mengirim ke RawBT… jika struk tidak tercetak, install aplikasi RawBT (Play Store) lalu cetak ulang dari Riwayat.', 'info');
+      printViaRawBT(trx, storeProfile);
+      handleResetTransaction();
+    } finally {
+      endTxSoon();
+    }
   };
 
   // 5. Direct Thermer Print (iOS Companion App)
   const handlePrintThermer = () => {
-    const trx = createCurrentTransaction();
-    if (!trx) return;
+    if (!tryBeginTx()) return;
+    try {
+      const trx = createCurrentTransaction();
+      if (!trx) return;
 
-    showToast('Membuka aplikasi Thermer iOS (POS-58)...', 'success');
-    printViaThermer(trx, storeProfile);
-    handleResetTransaction();
+      const sent = printViaThermer(trx, storeProfile);
+      if (sent) {
+        showToast('Membuka aplikasi Thermer iOS (POS-58)...', 'success');
+        handleResetTransaction();
+      } else {
+        // Cooldown Thermer (1.5s): URL scheme tidak terkirim kali ini.
+        // Transaksi sudah tersimpan — reset + arahkan Riwayat agar retry tidak dobel.
+        handleResetTransaction();
+        showToast(`Transaksi ${trx.invoiceNo} sudah tersimpan. Thermer belum siap (tunggu ±2 detik), cetak ulang dari Riwayat.`, 'info');
+      }
+    } finally {
+      endTxSoon();
+    }
   };
 
   const totalQty = cartItems.reduce((sum, item) => sum + item.qty, 0);
@@ -788,6 +858,10 @@ export const KasirView: React.FC<KasirViewProps> = ({
         numericCash={numericCash}
         changeAmount={changeAmount}
         isInsufficientCash={isInsufficientCash}
+        customerName={customerName}
+        setCustomerName={setCustomerName}
+        notes={notes}
+        setNotes={setNotes}
         onSaveOnly={handleSaveOnlyTransaction}
         onPrintBluetooth={handlePrintBluetooth}
         isPrintingBt={isPrintingBt}

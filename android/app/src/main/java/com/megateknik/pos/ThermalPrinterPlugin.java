@@ -21,6 +21,7 @@ import com.getcapacitor.annotation.Permission;
 import java.io.OutputStream;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @CapacitorPlugin(name = "ThermalPrinter", permissions = {
         @Permission(strings = { Manifest.permission.BLUETOOTH_CONNECT }, alias = "btConnect"),
@@ -33,6 +34,14 @@ public class ThermalPrinterPlugin extends Plugin {
 
     private BluetoothSocket socket = null;
     private String connectedAddress = null;
+
+    // Guard anti-race: hanya SATU proses cetak dalam satu waktu. Dua cetak
+    // tumpang tindih menulis byte tercampur ke socket yang sama (struk kacau).
+    private final AtomicBoolean printBusy = new AtomicBoolean(false);
+    // Menahan argumen print saat izin Bluetooth diminta, agar cetak dilanjutkan
+    // otomatis di btPermsCallback setelah user memberi izin.
+    private String pendingPrintData = null;
+    private String pendingPrintAddress = null;
 
     private boolean hasBtConnectPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -53,7 +62,20 @@ public class ThermalPrinterPlugin extends Plugin {
 
     @com.getcapacitor.PluginMethod(returnType = com.getcapacitor.PluginMethod.RETURN_NONE)
     public void btPermsCallback(PluginCall call) {
-        // Callback kosong, user tinggal panggil listPaired lagi
+        // Setelah dialog izin ditutup:
+        // - print tertunda -> lanjutkan otomatis kalau izin di-grant.
+        // - listPaired -> perilaku lama: user tinggal tap Scan lagi.
+        if (pendingPrintData != null) {
+            String data = pendingPrintData;
+            String address = pendingPrintAddress;
+            pendingPrintData = null;
+            pendingPrintAddress = null;
+            if (hasBtConnectPermission()) {
+                doPrint(call, data, address);
+            } else {
+                call.reject("Izin Bluetooth ditolak. Buka Pengaturan > Aplikasi > Mega Tehnik > Izinkan perangkat sekitar, lalu cetak ulang dari Riwayat.");
+            }
+        }
     }
 
     @PluginMethod
@@ -150,7 +172,21 @@ public class ThermalPrinterPlugin extends Plugin {
             return;
         }
         if (!hasBtConnectPermission()) {
-            call.reject("Izin Bluetooth belum diberikan. Buka Pengaturan > Aplikasi > Mega Tehnik > Izinkan Perangkat Sekitar.");
+            // Minta izin langsung dari sini — setelah di-grant, cetak dilanjutkan
+            // otomatis di btPermsCallback (tidak perlu tap Scan dulu).
+            pendingPrintData = base64Data;
+            pendingPrintAddress = address;
+            requestBtPermission(call);
+            return;
+        }
+        doPrint(call, base64Data, address);
+    }
+
+    private void doPrint(final PluginCall call, final String base64Data, final String address) {
+        // Tolak cetak tumpang tindih, jangan mengantre — antrean berarti struk
+        // tercetak dua kali tanpa user sadar.
+        if (!printBusy.compareAndSet(false, true)) {
+            call.reject("Cetak sebelumnya masih berjalan. Tunggu sebentar, lalu cetak ulang dari Riwayat.");
             return;
         }
 
@@ -198,6 +234,8 @@ public class ThermalPrinterPlugin extends Plugin {
                     msg = "Gagal konek ke printer. Pastikan printer nyala, kertas ada, dan belum konek ke HP lain. (" + msg + ")";
                 }
                 call.reject(msg);
+            } finally {
+                printBusy.set(false);
             }
         }).start();
     }

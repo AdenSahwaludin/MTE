@@ -53,10 +53,18 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     return matchesInvoice || matchesCustomer || matchesItem;
   });
 
-  // Calculate stats
+  // Calculate stats (pakai tanggal LOKAL, bukan UTC — toISOString bisa geser hari di WIB)
   const totalOmset = transactions.reduce((sum, t) => sum + t.totalAmount, 0);
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayTransactions = transactions.filter((t) => t.date.startsWith(todayStr));
+  const isTodayLocal = (iso: string): boolean => {
+    const d = new Date(iso);
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
+    );
+  };
+  const todayTransactions = transactions.filter((t) => isTodayLocal(t.date));
   const todayOmset = todayTransactions.reduce((sum, t) => sum + t.totalAmount, 0);
 
   const handleReprintBluetooth = async (t: Transaction) => {

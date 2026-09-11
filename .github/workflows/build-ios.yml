@@ -33,15 +33,20 @@ jobs:
       - name: Sync Capacitor iOS
         run: npx cap sync ios
 
+      - name: Show Xcode version
+        run: xcodebuild -version
+
       # Build TANPA tanda tangan (unsigned): .ipa-nya bisa dipakai setelah
       # ditandatangani — gratis via Sideloadly/AltStore (Apple ID biasa,
       # berlaku 7 hari) atau Xcode, resmi via Apple Developer $99/tahun
       # (TestFlight / App Store).
+      # Pakai -scheme (shared scheme App.xcscheme) — opsi -derivedDataPath
+      # tidak valid untuk build -target (xcodebuild exit 64).
       - name: Build iOS App (unsigned, device)
         run: |
           xcodebuild \
             -project ios/App/App.xcodeproj \
-            -target App \
+            -scheme App \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build/ios-derived \

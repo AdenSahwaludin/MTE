@@ -678,7 +678,7 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         writeWaiter?.succeed(())
     }
 
-    @objc(peripheralIsReadyToSendWriteWithoutResponse:)
+    @objc(peripheral:peripheralIsReadyToSendWriteWithoutResponse:)
     public func peripheral(
         _ peripheral: CBPeripheral,
         peripheralIsReady toSendWriteWithoutResponse: CBCharacteristic

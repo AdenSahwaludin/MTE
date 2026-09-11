@@ -589,7 +589,8 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc public func centralManager(
+    @objc(centralManager:didDiscoverPeripheral:advertisementData:RSSI:)
+    public func centralManager(
         _ central: CBCentralManager,
         didDiscover peripheral: CBPeripheral,
         advertisementData: [String: Any],
@@ -601,14 +602,16 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         scannedNames[peripheral.identifier] = name
     }
 
-    @objc public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+    @objc(centralManager:didConnectPeripheral:)
+    public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         connectedPeripheral = peripheral
         connectedAddress = peripheral.identifier.uuidString
         peripheral.delegate = self
         connectWaiter?.succeed(())
     }
 
-    @objc public func centralManager(
+    @objc(centralManager:didFailToConnectPeripheral:error:)
+    public func centralManager(
         _ central: CBCentralManager,
         didFailToConnect peripheral: CBPeripheral,
         error: Error?
@@ -647,7 +650,8 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         servicesWaiter?.succeed(())
     }
 
-    @objc public func peripheral(
+    @objc(peripheral:didDiscoverCharacteristicsForService:error:)
+    public func peripheral(
         _ peripheral: CBPeripheral,
         didDiscoverCharacteristicsFor service: CBService,
         error: Error?
@@ -661,7 +665,8 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         charsWaiter?.succeed(())
     }
 
-    @objc public func peripheral(
+    @objc(peripheral:didWriteValueForCharacteristic:error:)
+    public func peripheral(
         _ peripheral: CBPeripheral,
         didWriteValueFor characteristic: CBCharacteristic,
         error: Error?
@@ -673,7 +678,8 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         writeWaiter?.succeed(())
     }
 
-    @objc public func peripheral(
+    @objc(peripheralIsReadyToSendWriteWithoutResponse:)
+    public func peripheral(
         _ peripheral: CBPeripheral,
         peripheralIsReady toSendWriteWithoutResponse: CBCharacteristic
     ) {

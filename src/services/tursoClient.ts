@@ -1,20 +1,20 @@
 import { createClient, Client } from '@libsql/client/web';
 import { Product, Transaction, StoreProfile, UserAccount } from '../types';
 
-const DEFAULT_TURSO_URL = 'libsql://mega-teknik-elektronik-adensahwaludin.aws-ap-northeast-1.turso.io';
-const DEFAULT_TURSO_TOKEN = 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODcxNDg4MDYsImlkIjoiMDFhMDFhNWUtOGIwMS03NzgwLTliYjQtOTQ5YWIxYTk1M2VlIiwia2lkIjoiRVBsci1WZXk4cFpncEZUYmdmc3NmTXVMNUgzUWhDQVdzQk9sS204blJtMCIsInJpZCI6IjFmYTdhZmNlLWQ5ZWQtNDBmYi1hNThmLTUyZmE0OTNlZDNmYSJ9.-s_67DnajXUNcB9u4QBs-rz4HANrTWqICLWadCQ834fKIogiVv2Iut8KYAxeriYvRoL79HDoIfBtJ89u9ARhDg';
-
-// Extract credentials injected via Vite define / environment variables with fallback
+// Kredensial WAJIB via environment (.env) — JANGAN hardcode token di source.
+// Lihat .env.example. Token di-bundle frontend selalu bisa dibaca publik,
+// jadi untuk produksi gunakan token read-only / short-lived dan rotasi berkala,
+// atau pindahkan tulis via backend/edge function.
 const rawUrl = (
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TURSO_DATABASE_URL) ||
   (typeof process !== 'undefined' && process.env?.TURSO_DATABASE_URL) ||
-  DEFAULT_TURSO_URL
+  ''
 ).trim();
 
 const rawToken = (
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TURSO_AUTH_TOKEN) ||
   (typeof process !== 'undefined' && process.env?.TURSO_AUTH_TOKEN) ||
-  DEFAULT_TURSO_TOKEN
+  ''
 ).trim();
 
 // Normalize URL for web client fetch protocol
@@ -223,7 +223,7 @@ export const fetchAllProductsFromTurso = async (): Promise<Product[]> => {
       aliases,
       price: Number(row.price),
       unit: String(row.unit || 'Pcs'),
-      category: String(row.category || 'Umum'),
+      category: row.category ? String(row.category) : '',
       createdBy: row.created_by ? String(row.created_by) : undefined,
       createdAt: String(row.created_at || new Date().toISOString()),
       updatedAt: String(row.updated_at || new Date().toISOString()),
@@ -255,7 +255,7 @@ export const upsertProductToTurso = async (product: Product): Promise<void> => {
       JSON.stringify(product.aliases || []),
       product.price,
       product.unit || 'Pcs',
-      product.category || 'Umum',
+      product.category || '',
       product.createdBy || null,
       product.createdAt || new Date().toISOString(),
       product.updatedAt || new Date().toISOString(),
@@ -301,7 +301,7 @@ export const batchUpsertProductsToTurso = async (products: Product[]): Promise<v
         JSON.stringify(p.aliases || []),
         p.price,
         p.unit || 'Pcs',
-        p.category || 'Umum',
+        p.category || '',
         p.createdBy || null,
         p.createdAt || new Date().toISOString(),
         p.updatedAt || new Date().toISOString(),
@@ -544,28 +544,53 @@ export const upsertUserToTurso = async (user: UserAccount): Promise<void> => {
   if (!client) return;
 
   const now = new Date().toISOString();
-  await client.execute({
-    sql: `
-      INSERT INTO users (id, username, password, name, role, created_at, updated_at, is_deleted)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-      ON CONFLICT(id) DO UPDATE SET
-        username = excluded.username,
-        password = excluded.password,
-        name = excluded.name,
-        role = excluded.role,
-        updated_at = excluded.updated_at,
-        is_deleted = 0;
-    `,
-    args: [
-      user.id,
-      user.username.toLowerCase().trim(),
-      user.password,
-      user.name.trim(),
-      user.role,
-      user.createdAt || now,
-      user.updatedAt || now,
-    ],
-  });
+  try {
+    await client.execute({
+      sql: `
+        INSERT INTO users (id, username, password, name, role, created_at, updated_at, is_deleted)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+        ON CONFLICT(id) DO UPDATE SET
+          username = excluded.username,
+          password = excluded.password,
+          name = excluded.name,
+          role = excluded.role,
+          updated_at = excluded.updated_at,
+          is_deleted = 0;
+      `,
+      args: [
+        user.id,
+        user.username.toLowerCase().trim(),
+        user.password,
+        user.name.trim(),
+        user.role,
+        user.createdAt || now,
+        user.updatedAt || now,
+      ],
+    });
+  } catch (err: any) {
+    // Tabrakan antar device: id sama tapi username beda (atau sebaliknya).
+    // username adalah natural key -> menangkan penulis terakhir per username
+    // agar antrean tidak buntu / ter-drop diam-diam.
+    const msg = String(err?.message || err || '');
+    if (msg.includes('UNIQUE constraint failed: users.username')) {
+      await client.execute({
+        sql: `
+          UPDATE users
+          SET password = ?, name = ?, role = ?, updated_at = ?, is_deleted = 0
+          WHERE username = ?;
+        `,
+        args: [
+          user.password,
+          user.name.trim(),
+          user.role,
+          user.updatedAt || now,
+          user.username.toLowerCase().trim(),
+        ],
+      });
+      return;
+    }
+    throw err;
+  }
 };
 
 export const deleteUserFromTurso = async (id: number | string): Promise<void> => {
@@ -607,7 +632,15 @@ export const batchUpsertUsersToTurso = async (users: UserAccount[]): Promise<voi
     ],
   }));
 
-  await client.batch(statements, 'write');
+  try {
+    await client.batch(statements, 'write');
+  } catch {
+    // Satu baris konflik username bisa menggagalkan seluruh batch —
+    // fallback ke upsert satuan (yang me-resolve per username).
+    for (const u of users) {
+      await upsertUserToTurso(u);
+    }
+  }
 };
 
 // --- SMART LOW-ROW METADATA CHECK ---
@@ -647,6 +680,8 @@ export const clearAllTursoData = async (): Promise<void> => {
   const client = getTursoClient();
   if (!client) return;
 
+  // ID integer agar konsisten dengan initTursoTables (AUTOINCREMENT) dan
+  // addOrUpdateUser (Number(id)). Jangan pakai string seperti 'user-admin'.
   const now = new Date().toISOString();
   await client.batch([
     { sql: 'DELETE FROM products;', args: [] },
@@ -656,7 +691,14 @@ export const clearAllTursoData = async (): Promise<void> => {
     {
       sql: `
         INSERT INTO users (id, username, password, name, role, created_at, updated_at, is_deleted)
-        VALUES ('user-admin', 'admin', 'admin123', 'Administrator', 'admin', ?, ?, 0);
+        VALUES (1, 'admin', 'admin123', 'Administrator', 'admin', ?, ?, 0);
+      `,
+      args: [now, now],
+    },
+    {
+      sql: `
+        INSERT INTO users (id, username, password, name, role, created_at, updated_at, is_deleted)
+        VALUES (2, 'kasir', 'kasir123', 'Kasir 01', 'kasir', ?, ?, 0);
       `,
       args: [now, now],
     },

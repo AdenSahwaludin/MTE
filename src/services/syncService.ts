@@ -28,6 +28,7 @@ import {
   setInMemoryStoreProfile,
   getUsers,
   setInMemoryUsers,
+  generateSyncActionId,
 } from './storageService';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error';
@@ -60,6 +61,11 @@ export interface SyncAction {
 type SyncListener = (info: SyncInfo) => void;
 type DataRefreshListener = () => void;
 
+const isBrowserOnline = (): boolean => {
+  if (typeof navigator === 'undefined') return true;
+  return navigator.onLine;
+};
+
 class SyncService {
   private queue: SyncAction[] = [];
   private status: SyncStatus = 'idle';
@@ -70,6 +76,7 @@ class SyncService {
   private isProcessingQueue = false;
   private isInitialLoaded = false;
   private periodicTimer: any = null;
+  private readonly QUEUE_LS_KEY = 'mega_teknik_sync_queue_v2';
 
   // Cached local timestamps for smart low-row delta checks
   private localProductTimestamp: string | null = null;
@@ -78,7 +85,33 @@ class SyncService {
   private localUserTimestamp: string | null = null;
 
   constructor() {
+    this.loadQueueFromStorage();
     this.setupNetworkListeners();
+  }
+
+  private loadQueueFromStorage() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(this.QUEUE_LS_KEY);
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        this.queue = arr.filter((a) => a && typeof a.type === 'string');
+      }
+    } catch {
+      this.queue = [];
+    }
+  }
+
+  private persistQueue() {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+    try {
+      // Batasi 500 aksi agar tidak melebihi kuota localStorage
+      const capped = this.queue.slice(-500);
+      localStorage.setItem(this.QUEUE_LS_KEY, JSON.stringify(capped));
+    } catch (err) {
+      console.warn('Failed to persist sync queue:', err);
+    }
   }
 
   private notify() {
@@ -114,7 +147,7 @@ class SyncService {
   }
 
   public getSyncInfo(): SyncInfo {
-    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    const isOnline = isBrowserOnline();
     return {
       status: !isOnline ? 'offline' : this.status,
       lastSyncedAt: this.lastSyncedAt,
@@ -137,14 +170,14 @@ class SyncService {
     });
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && navigator.onLine) {
+      if (document.visibilityState === 'visible' && isBrowserOnline()) {
         this.smartHeartbeat();
       }
     });
 
     // Smart background heartbeat: check timestamps every 90 seconds (consumes only 4 rows read)
     this.periodicTimer = setInterval(() => {
-      if (navigator.onLine && !this.isProcessingQueue) {
+      if (isBrowserOnline() && !this.isProcessingQueue) {
         this.smartHeartbeat();
       }
     }, 90000);
@@ -152,7 +185,7 @@ class SyncService {
 
   // Low-row metadata check (Reads only 4 rows instead of entire database)
   public async smartHeartbeat(): Promise<void> {
-    if (!navigator.onLine || !isTursoConfigured() || this.isProcessingQueue) return;
+    if (!isBrowserOnline() || !isTursoConfigured() || this.isProcessingQueue) return;
 
     if (!this.isInitialLoaded) {
       await this.syncNow();
@@ -171,17 +204,25 @@ class SyncService {
       let hasChanges = false;
 
       if (remoteMeta.productMod && remoteMeta.productMod !== this.localProductTimestamp) {
+        // Tanpa guard length: hapus-semua-produk di cloud HARUS mengosongkan lokal.
+        // (fetch hanya melempar saat error jaringan, jadi [] = data memang kosong.)
         const freshProducts = await fetchAllProductsFromTurso();
-        if (freshProducts.length > 0) {
-          setInMemoryProducts(freshProducts);
-          this.localProductTimestamp = remoteMeta.productMod;
-          hasChanges = true;
-        }
+        setInMemoryProducts(freshProducts);
+        this.localProductTimestamp = remoteMeta.productMod;
+        hasChanges = true;
       }
 
       if (remoteMeta.trxMod && remoteMeta.trxMod !== this.localTrxTimestamp) {
         const freshTransactions = await fetchAllTransactionsFromTurso();
-        setInMemoryTransactions(freshTransactions);
+        // Merge, bukan overwrite: pertahankan transaksi lokal yang belum terkirim
+        // (id UUID) agar tidak hilang saat heartbeat.
+        const pendingIds = new Set(
+          this.queue.filter((a) => a.type === 'INSERT_TRANSACTION' && a.payload?.id).map((a) => String(a.payload.id))
+        );
+        const localOnly = getTransactions().filter(
+          (t) => pendingIds.has(t.id) && !freshTransactions.some((f) => f.id === t.id)
+        );
+        setInMemoryTransactions([...localOnly, ...freshTransactions]);
         this.localTrxTimestamp = remoteMeta.trxMod;
         hasChanges = true;
       }
@@ -197,11 +238,10 @@ class SyncService {
 
       if (remoteMeta.userMod && remoteMeta.userMod !== this.localUserTimestamp) {
         const freshUsers = await fetchAllUsersFromTurso();
-        if (freshUsers.length > 0) {
-          setInMemoryUsers(freshUsers);
-          this.localUserTimestamp = remoteMeta.userMod;
-          hasChanges = true;
-        }
+        // setInMemoryUsers punya fallback DEFAULT_USERS bila [] — aman tanpa guard.
+        setInMemoryUsers(freshUsers);
+        this.localUserTimestamp = remoteMeta.userMod;
+        hasChanges = true;
       }
 
       this.lastSyncedAt = new Date().toISOString();
@@ -219,7 +259,7 @@ class SyncService {
   // Enqueue mutation to be saved directly to Turso
   public enqueue(type: SyncActionType, payload: any) {
     const action: SyncAction = {
-      id: 'sync-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      id: generateSyncActionId(),
       type,
       payload,
       createdAt: new Date().toISOString(),
@@ -239,9 +279,10 @@ class SyncService {
     }
 
     this.queue.push(action);
+    this.persistQueue();
     this.notify();
 
-    if (navigator.onLine) {
+    if (typeof navigator === 'undefined' || navigator.onLine) {
       setTimeout(() => this.processQueue(), 50);
     }
   }
@@ -249,7 +290,7 @@ class SyncService {
   // Process all queued actions to Turso
   private async processQueue(): Promise<boolean> {
     if (this.isProcessingQueue || this.queue.length === 0) return true;
-    if (!navigator.onLine || !isTursoConfigured()) return false;
+    if (!isBrowserOnline() || !isTursoConfigured()) return false;
 
     this.isProcessingQueue = true;
     this.status = 'syncing';
@@ -285,12 +326,17 @@ class SyncService {
               break;
           }
           this.queue.shift();
+          this.persistQueue();
           this.notify();
         } catch (itemErr: any) {
           console.error(`Failed to process sync item [${item.type}]:`, itemErr);
           item.retryCount = (item.retryCount || 0) + 1;
           if (item.retryCount > 4) {
+            // Drop agar antrean tidak buntu selamanya, tapi persist agar konsisten.
             this.queue.shift();
+            this.persistQueue();
+          } else {
+            this.persistQueue();
           }
           throw itemErr;
         }
@@ -312,7 +358,7 @@ class SyncService {
 
   // Full Initial Load or Force Sync
   public async syncNow(forcePushAll: boolean = false): Promise<{ success: boolean; message?: string }> {
-    if (!navigator.onLine) {
+    if (!isBrowserOnline()) {
       this.status = 'offline';
       this.notify();
       return { success: false, message: 'Aplikasi sedang offline' };
@@ -350,10 +396,19 @@ class SyncService {
           await batchUpsertUsersToTurso(localUsers);
         }
         this.queue = [];
+        this.persistQueue();
       } else {
-        // Process any pending queued mutations first
+        // Process any pending queued mutations first.
+        // PENTING: jika masih ada yang gagal terkirim, JANGAN pull-overwrite
+        // karena akan menghapus data offline lokal yang belum naik.
         if (this.queue.length > 0) {
-          await this.processQueue();
+          const flushed = await this.processQueue();
+          if (!flushed || this.queue.length > 0) {
+            return {
+              success: false,
+              message: `Masih ada ${this.queue.length} perubahan offline yang belum terkirim. Data lokal dipertahankan.`,
+            };
+          }
         }
 
         // Pull full data from Turso (only once on load or manual sync button)
@@ -364,14 +419,24 @@ class SyncService {
           fetchAllUsersFromTurso(),
         ]);
 
-        if (freshProducts.length > 0) {
+        // Merge transaksi: fresh + lokal-yang-tidak-ada-di-cloud.
+        // Mencegah kasus: transaksi dibuat offline tepat sebelum pull selesai.
+        const localTx = getTransactions();
+        const freshIds = new Set(freshTransactions.map((t) => t.id));
+        const localOnlyTx = localTx.filter((t) => !freshIds.has(t.id));
+        const mergedTx =
+          localOnlyTx.length > 0 ? [...localOnlyTx, ...freshTransactions] : freshTransactions;
+
+        // Produk: cloud adalah sumber kebenaran SETELAH queue kosong.
+        // Jika cloud kosong & lokal ada (DB baru), push lokal ke cloud.
+        if (freshProducts.length > 0 || getProducts().length === 0) {
           setInMemoryProducts(freshProducts);
-        } else if (getProducts().length > 0) {
+        } else {
           // If Turso was freshly created and empty, push initial default products
           await batchUpsertProductsToTurso(getProducts());
         }
 
-        setInMemoryTransactions(freshTransactions);
+        setInMemoryTransactions(mergedTx);
 
         if (freshProfile) {
           setInMemoryStoreProfile(freshProfile);
@@ -418,7 +483,7 @@ class SyncService {
 
   // Clear all records from Turso Cloud
   public async clearTursoDatabase(clearMemoryToo: boolean = false): Promise<{ success: boolean; message?: string }> {
-    if (!navigator.onLine) {
+    if (!isBrowserOnline()) {
       return { success: false, message: 'Aplikasi sedang offline' };
     }
     if (!isTursoConfigured()) {
@@ -431,6 +496,7 @@ class SyncService {
     try {
       await clearAllTursoData();
       this.queue = [];
+      this.persistQueue();
 
       if (clearMemoryToo) {
         setInMemoryProducts([]);

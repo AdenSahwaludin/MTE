@@ -1,46 +1,41 @@
 import { UserAccount } from '../types';
 import { fetchAllUsersFromTurso, isTursoConfigured } from './tursoClient';
 import { getUsers, setInMemoryUsers } from './storageService';
+import {
+  SESSION_DURATION_DAYS,
+  SESSION_DURATION_MS,
+  STORAGE_SESSION_KEY,
+  LEGACY_AUTH_KEY,
+  LEGACY_SESSION_AUTH_KEY,
+  SafeUser,
+  AuthSession,
+  generateChecksum,
+  toSafeUser,
+  createAuthSession,
+  validateAndRefreshSession,
+  clearAuthSession,
+  getActiveSessionUser,
+  isAdminSession,
+} from './sessionStore';
 
-// 7 Days Session Expiration Duration in milliseconds
-export const SESSION_DURATION_DAYS = 7;
-export const SESSION_DURATION_MS = SESSION_DURATION_DAYS * 24 * 60 * 60 * 1000; // 604,800,000 ms
-
-export const STORAGE_SESSION_KEY = 'mega_teknik_auth_session_v2';
-export const LEGACY_AUTH_KEY = 'mega_teknik_auth';
-export const LEGACY_SESSION_AUTH_KEY = 'mega_teknik_active_session';
-
-export interface SafeUser {
-  id: number | string;
-  username: string;
-  name: string;
-  role: 'admin' | 'kasir';
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface AuthSession {
-  user: SafeUser;
-  loginAt: number;      // Initial login timestamp (ms)
-  lastActiveAt: number; // Last activity timestamp (ms)
-  expiresAt: number;    // Expiration timestamp (ms) = lastActiveAt + 7 days
-  checksum: string;     // Integrity validation checksum
-}
-
-// Simple deterministic hash checksum for tamper detection without heavy crypto library
-const generateChecksum = (user: SafeUser, lastActiveAt: number, expiresAt: number): string => {
-  const raw = `${user.id}:${user.username}:${user.role}:${lastActiveAt}:${expiresAt}:mte_secure_salt_2026`;
-  let hash = 0;
-  for (let i = 0; i < raw.length; i++) {
-    const char = raw.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0; // Convert to 32bit integer
-  }
-  return 'chk_' + Math.abs(hash).toString(36);
+// Re-export session API agar import lama (App, LoginView) tetap jalan.
+// Implementasi tunggal ada di sessionStore (memecah circular import
+// storageService <-> authService yang lama).
+export {
+  SESSION_DURATION_DAYS,
+  SESSION_DURATION_MS,
+  STORAGE_SESSION_KEY,
+  LEGACY_AUTH_KEY,
+  LEGACY_SESSION_AUTH_KEY,
+  generateChecksum,
+  toSafeUser,
+  createAuthSession,
+  validateAndRefreshSession,
+  clearAuthSession,
+  getActiveSessionUser,
+  isAdminSession,
 };
-
-// In-memory cache for fast sync access
-let currentActiveUser: UserAccount | null = null;
+export type { SafeUser, AuthSession };
 
 // =========================================================
 // ERROR CLASSIFICATION & USER-FRIENDLY MAPPING
@@ -193,175 +188,16 @@ export const classifyAuthError = (err: any): AuthErrorResult => {
 };
 
 // =========================================================
-// 7-DAY SLIDING EXPIRATION SESSION MANAGEMENT
+// AUTHENTICATION LOGIN EXECUTION (dengan fallback offline)
 // =========================================================
 
 /**
- * Strips sensitive data (password) and constructs a safe user object
- */
-export const toSafeUser = (user: UserAccount): SafeUser => {
-  return {
-    id: user.id,
-    username: (user.username || '').trim().toLowerCase(),
-    name: user.name || user.username,
-    role: user.role || 'kasir',
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  };
-};
-
-/**
- * Creates and stores a new 7-day sliding expiration session
- */
-export const createAuthSession = (user: UserAccount): AuthSession => {
-  const safeUser = toSafeUser(user);
-  const now = Date.now();
-  const expiresAt = now + SESSION_DURATION_MS;
-  const checksum = generateChecksum(safeUser, now, expiresAt);
-
-  const session: AuthSession = {
-    user: safeUser,
-    loginAt: now,
-    lastActiveAt: now,
-    expiresAt,
-    checksum,
-  };
-
-  try {
-    const raw = JSON.stringify(session);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_SESSION_KEY, raw);
-      localStorage.setItem(LEGACY_AUTH_KEY, 'true');
-    }
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem(STORAGE_SESSION_KEY, raw);
-      sessionStorage.setItem(LEGACY_AUTH_KEY, 'true');
-    }
-  } catch (err) {
-    console.warn('Failed to persist auth session in storage:', err);
-  }
-
-  currentActiveUser = {
-    ...safeUser,
-    password: '',
-  };
-
-  return session;
-};
-
-/**
- * Validates stored session with 7-day Sliding Expiration:
- * - If valid and not expired: extends expiresAt to now + 7 days (sliding window)
- * - If expired (not accessed for > 7 days) or tampered: purges session and returns null
- */
-export const validateAndRefreshSession = (): UserAccount | null => {
-  if (typeof window === 'undefined') return null;
-
-  try {
-    let raw: string | null = null;
-    if (typeof localStorage !== 'undefined') {
-      raw = localStorage.getItem(STORAGE_SESSION_KEY);
-    }
-    if (!raw && typeof sessionStorage !== 'undefined') {
-      raw = sessionStorage.getItem(STORAGE_SESSION_KEY);
-    }
-
-    if (!raw) {
-      // Clean up any stale legacy tokens if no modern session exists
-      clearAuthSession();
-      return null;
-    }
-
-    const session: AuthSession = JSON.parse(raw);
-    if (!session || !session.user || !session.expiresAt || !session.lastActiveAt) {
-      clearAuthSession();
-      return null;
-    }
-
-    const now = Date.now();
-
-    // Check expiration: If more than 7 days have passed since last access
-    if (now > session.expiresAt) {
-      console.info('Auth session expired (inactive for > 7 days). Redirecting to login.');
-      clearAuthSession();
-      return null;
-    }
-
-    // Verify integrity checksum
-    const expectedChecksum = generateChecksum(session.user, session.lastActiveAt, session.expiresAt);
-    if (session.checksum && session.checksum !== expectedChecksum) {
-      console.warn('Auth session checksum mismatch. Purging invalid session.');
-      clearAuthSession();
-      return null;
-    }
-
-    // SLIDING EXPIRATION: Reset validity window to 7 days from right now!
-    session.lastActiveAt = now;
-    session.expiresAt = now + SESSION_DURATION_MS;
-    session.checksum = generateChecksum(session.user, session.lastActiveAt, session.expiresAt);
-
-    // Save updated sliding session
-    const updatedRaw = JSON.stringify(session);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_SESSION_KEY, updatedRaw);
-    }
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem(STORAGE_SESSION_KEY, updatedRaw);
-    }
-
-    const activeUser: UserAccount = {
-      id: session.user.id,
-      username: session.user.username,
-      name: session.user.name,
-      role: session.user.role,
-      password: '',
-      createdAt: session.user.createdAt,
-      updatedAt: session.user.updatedAt,
-    };
-
-    currentActiveUser = activeUser;
-    return activeUser;
-  } catch (err) {
-    console.error('Session validation error:', err);
-    clearAuthSession();
-    return null;
-  }
-};
-
-/**
- * Fully purges all auth sessions and tokens
- */
-export const clearAuthSession = (): void => {
-  currentActiveUser = null;
-  if (typeof window === 'undefined') return;
-
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(STORAGE_SESSION_KEY);
-      localStorage.removeItem(LEGACY_AUTH_KEY);
-      localStorage.removeItem(LEGACY_SESSION_AUTH_KEY);
-    }
-    if (typeof sessionStorage !== 'undefined') {
-      sessionStorage.removeItem(STORAGE_SESSION_KEY);
-      sessionStorage.removeItem(LEGACY_AUTH_KEY);
-      sessionStorage.removeItem(LEGACY_SESSION_AUTH_KEY);
-    }
-  } catch (err) {
-    console.warn('Error while clearing auth session:', err);
-  }
-};
-
-export const getActiveSessionUser = (): UserAccount | null => {
-  if (currentActiveUser) return currentActiveUser;
-  return validateAndRefreshSession();
-};
-
-// =========================================================
-// AUTHENTICATION LOGIN EXECUTION
-// =========================================================
-
-/**
- * Authenticates user credentials with accurate error mapping and sliding session initialization
+ * Login dengan strategi:
+ * 1. Jika online + Turso terkonfigurasi: coba ambil user terbaru (timeout 8 dtk).
+ * 2. Jika gagal/offline: FALLBACK ke user lokal (localStorage) agar kasir
+ *    tetap bisa login saat internet mati (sebelumnya langsung throw NO_INTERNET).
+ * 3. Jika cocok lokal -> sesi dibuat. Jika tidak cocok dan ada network error
+ *    -> lempar network error (lebih akurat dari "password salah").
  */
 export const loginWithCredentials = async (
   usernameInput: string,
@@ -378,21 +214,14 @@ export const loginWithCredentials = async (
     };
   }
 
-  // 1. If device is explicitly offline, check network status immediately
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    throw {
-      code: 'NO_INTERNET',
-      messageId: 'Tidak dapat terhubung ke internet. Periksa koneksi Anda lalu coba lagi.',
-      messageEn: 'Cannot connect to the internet. Please check your connection and try again.',
-    };
-  }
+  const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
 
   let freshUsers: UserAccount[] = [];
+  let networkError: AuthErrorResult | null = null;
 
-  // 2. If Turso is configured, attempt to fetch fresh user pool with timeout
-  if (isTursoConfigured()) {
+  // 1. Coba refresh dari Turso hanya jika online & terkonfigurasi
+  if (isOnline && isTursoConfigured()) {
     try {
-      // 8-second timeout promise
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           const timeoutErr = new Error('Request timeout while connecting to authentication server.');
@@ -406,24 +235,12 @@ export const loginWithCredentials = async (
         setInMemoryUsers(freshUsers);
       }
     } catch (tursoErr: any) {
-      console.warn('Turso login verification encountered error:', tursoErr);
-      const classified = classifyAuthError(tursoErr);
-
-      // If it's a severe network/server/db error, throw it directly so the user gets accurate feedback!
-      if (
-        classified.code === 'NO_INTERNET' ||
-        classified.code === 'REQUEST_TIMEOUT' ||
-        classified.code === 'INTERNAL_SERVER_ERROR' ||
-        classified.code === 'SERVICE_UNAVAILABLE' ||
-        classified.code === 'SERVER_UNREACHABLE' ||
-        classified.code === 'DATABASE_ERROR'
-      ) {
-        throw classified;
-      }
+      console.warn('Turso login verification encountered error (fallback ke lokal):', tursoErr);
+      networkError = classifyAuthError(tursoErr);
     }
   }
 
-  // 3. Match against user pool (fresh Turso or local in-memory)
+  // 2. Match terhadap pool (fresh Turso atau lokal tersimpan)
   const userPool = freshUsers.length > 0 ? freshUsers : getUsers();
   const matched = userPool.find((u) => {
     const uName = (u.username || '').trim().toLowerCase();
@@ -431,15 +248,21 @@ export const loginWithCredentials = async (
     return uName === trimmedUsername && (uPass === trimmedPassword || u.password === passwordInput);
   });
 
-  if (!matched) {
-    throw {
-      code: 'INVALID_CREDENTIALS',
-      messageId: 'Username atau password yang Anda masukkan salah.',
-      messageEn: 'The username or password you entered is incorrect.',
-    };
+  if (matched) {
+    createAuthSession(matched);
+    return matched;
   }
 
-  // 4. Create 7-day sliding expiration session
-  createAuthSession(matched);
-  return matched;
+  // 3. Tidak cocok: jika ada network error, laporkan itu (bukan password salah)
+  if (networkError) {
+    throw networkError;
+  }
+
+  throw {
+    code: 'INVALID_CREDENTIALS',
+    messageId: isOnline
+      ? 'Username atau password yang Anda masukkan salah.'
+      : 'Username atau password salah (mode offline — memakai data lokal tersimpan).',
+    messageEn: 'The username or password you entered is incorrect.',
+  };
 };

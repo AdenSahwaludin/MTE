@@ -28,6 +28,10 @@ export interface PaymentModalProps {
   numericCash: number;
   changeAmount: number;
   isInsufficientCash: boolean;
+  customerName: string;
+  setCustomerName: (val: string) => void;
+  notes: string;
+  setNotes: (val: string) => void;
   onSaveOnly: () => void;
   onPrintBluetooth: () => void;
   isPrintingBt: boolean;
@@ -49,6 +53,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   numericCash,
   changeAmount,
   isInsufficientCash,
+  customerName,
+  setCustomerName,
+  notes,
+  setNotes,
   onSaveOnly,
   onPrintBluetooth,
   isPrintingBt,
@@ -199,6 +207,40 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <span className="change-value">{formatRupiah(Math.max(0, changeAmount))}</span>
               </div>
             )}
+          </div>
+
+          {/* Info Pelanggan & Catatan (opsional, ikut tercetak di struk) */}
+          <div className="payment-field-group">
+            <div className="form-group" style={{ marginBottom: '0.6rem' }}>
+              <label className="payment-section-label" htmlFor="payment-customer">
+                Nama Pelanggan (opsional)
+              </label>
+              <input
+                id="payment-customer"
+                type="text"
+                className="form-input"
+                placeholder="Contoh: Budi"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                maxLength={60}
+                autoComplete="off"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="payment-section-label" htmlFor="payment-notes">
+                Catatan Struk (opsional)
+              </label>
+              <input
+                id="payment-notes"
+                type="text"
+                className="form-input"
+                placeholder="Contoh: tempo / garansi 1 minggu"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                maxLength={120}
+                autoComplete="off"
+              />
+            </div>
           </div>
 
           {/* Cetak & Simpan Action Buttons */}

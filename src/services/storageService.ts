@@ -2,17 +2,13 @@ import { Product, Transaction, StoreProfile, UserAccount } from '../types';
 import { DEFAULT_STORE_PROFILE, INITIAL_SAMPLE_PRODUCTS, DEFAULT_USERS } from './defaultData';
 import { syncService } from './syncService';
 import {
-  fetchAllUsersFromTurso,
-  upsertUserToTurso,
-  deleteUserFromTurso,
-} from './tursoClient';
-import {
   createAuthSession,
   clearAuthSession,
   getActiveSessionUser,
-} from './authService';
+} from './sessionStore';
 
-// Clean up legacy persistent localStorage keys immediately
+// Clean up legacy persistent localStorage keys immediately (v1, unversioned).
+// Data v2 (di bawah) dipertahankan — jangan dihapus.
 const purgeLegacyLocalStorage = () => {
   if (typeof window === 'undefined') return;
   try {
@@ -32,11 +28,98 @@ const purgeLegacyLocalStorage = () => {
 
 purgeLegacyLocalStorage();
 
-// Fast Reactive In-Memory State (0 ms read latency for POS autocomplete and UI)
-let inMemoryProducts: Product[] = [...INITIAL_SAMPLE_PRODUCTS];
-let inMemoryTransactions: Transaction[] = [];
-let inMemoryStoreProfile: StoreProfile = { ...DEFAULT_STORE_PROFILE };
-let inMemoryUsers: UserAccount[] = [...DEFAULT_USERS];
+// --- PERSISTENSI LOKAL v2 (tahan reload & offline) ---
+// Sebelumnya semua state hanya in-memory: reload = data hilang.
+// Sekarang setiap mutasi ditulis ke localStorage (best-effort, quota-safe).
+const LS_PRODUCTS_KEY = 'mega_teknik_products_v2';
+const LS_TRANSACTIONS_KEY = 'mega_teknik_transactions_v2';
+const LS_PROFILE_KEY = 'mega_teknik_profile_v2';
+const LS_USERS_KEY = 'mega_teknik_users_v2';
+const MAX_LOCAL_TRANSACTIONS = 2000;
+
+const readJSON = <T,>(key: string, fallback: T): T => {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+const writeJSON = (key: string, value: unknown): void => {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    console.warn(`Failed to persist ${key} (quota?)`, err);
+  }
+};
+
+const isValidProduct = (p: any): p is Product => {
+  return Boolean(p) && typeof p.id === 'string' && typeof p.name === 'string' && typeof p.price === 'number';
+};
+
+const loadPersistedProducts = (): Product[] => {
+  const arr = readJSON<unknown>(LS_PRODUCTS_KEY, null);
+  if (Array.isArray(arr)) {
+    const valid = arr.filter(isValidProduct);
+    if (valid.length > 0 || arr.length === 0) return valid;
+  }
+  return [...INITIAL_SAMPLE_PRODUCTS];
+};
+
+const loadPersistedTransactions = (): Transaction[] => {
+  const arr = readJSON<unknown>(LS_TRANSACTIONS_KEY, null);
+  if (Array.isArray(arr)) {
+    return (arr as Transaction[]).filter((t) => t && typeof t.id === 'string');
+  }
+  return [];
+};
+
+const loadPersistedProfile = (): StoreProfile => {
+  const obj = readJSON<Partial<StoreProfile> | null>(LS_PROFILE_KEY, null);
+  if (obj && typeof obj === 'object') {
+    return { ...DEFAULT_STORE_PROFILE, ...obj };
+  }
+  return { ...DEFAULT_STORE_PROFILE };
+};
+
+const loadPersistedUsers = (): UserAccount[] => {
+  const arr = readJSON<unknown>(LS_USERS_KEY, null);
+  if (Array.isArray(arr) && arr.length > 0) {
+    const valid = (arr as UserAccount[]).filter((u) => u && typeof u.username === 'string');
+    if (valid.length > 0) return valid;
+  }
+  return [...DEFAULT_USERS];
+};
+
+// Fast Reactive In-Memory State, dihidrasi dari localStorage (tahan reload)
+let inMemoryProducts: Product[] = loadPersistedProducts();
+let inMemoryTransactions: Transaction[] = loadPersistedTransactions();
+let inMemoryStoreProfile: StoreProfile = loadPersistedProfile();
+let inMemoryUsers: UserAccount[] = loadPersistedUsers();
+
+const persistProducts = () => writeJSON(LS_PRODUCTS_KEY, inMemoryProducts);
+const persistProfile = () => writeJSON(LS_PROFILE_KEY, inMemoryStoreProfile);
+const persistUsers = () => writeJSON(LS_USERS_KEY, inMemoryUsers);
+const persistTransactions = () => {
+  try {
+    const capped =
+      inMemoryTransactions.length > MAX_LOCAL_TRANSACTIONS
+        ? inMemoryTransactions.slice(0, MAX_LOCAL_TRANSACTIONS)
+        : inMemoryTransactions;
+    writeJSON(LS_TRANSACTIONS_KEY, capped);
+  } catch {
+    // Fallback ekstrem: simpan 500 terakhir saja
+    try {
+      writeJSON(LS_TRANSACTIONS_KEY, inMemoryTransactions.slice(0, 500));
+    } catch {
+      /* abaikan — in-memory tetap jalan */
+    }
+  }
+};
 
 const SESSION_AUTH_KEY = 'mega_teknik_active_session';
 
@@ -44,18 +127,22 @@ const SESSION_AUTH_KEY = 'mega_teknik_active_session';
 
 export const setInMemoryProducts = (products: Product[]) => {
   inMemoryProducts = Array.isArray(products) ? products : [];
+  persistProducts();
 };
 
 export const setInMemoryTransactions = (transactions: Transaction[]) => {
   inMemoryTransactions = Array.isArray(transactions) ? transactions : [];
+  persistTransactions();
 };
 
 export const setInMemoryStoreProfile = (profile: StoreProfile) => {
   inMemoryStoreProfile = { ...DEFAULT_STORE_PROFILE, ...profile };
+  persistProfile();
 };
 
 export const setInMemoryUsers = (users: UserAccount[]) => {
   inMemoryUsers = Array.isArray(users) && users.length > 0 ? users : [...DEFAULT_USERS];
+  persistUsers();
 };
 
 // --- PRODUCTS ---
@@ -66,6 +153,7 @@ export const getProducts = (): Product[] => {
 
 export const saveProductsListDirect = (products: Product[]): void => {
   inMemoryProducts = products;
+  persistProducts();
 };
 
 export const findProductByNameOrAlias = (query: string): Product | undefined => {
@@ -116,11 +204,30 @@ export const searchProducts = (query: string): SearchMatch[] => {
   });
 };
 
+// ID unik lintas device tanpa server-sequence: timestamp base36 + random.
+// crypto.randomUUID dipakai bila tersedia (secure), fallback manual.
+export const generateUniqueId = (prefix: string): string => {
+  try {
+    const g: any = globalThis as any;
+    if (g?.crypto?.randomUUID) return `${prefix}-${g.crypto.randomUUID()}`;
+  } catch {
+    /* fallback di bawah */
+  }
+  const time = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `${prefix}-${time}-${rand}`;
+};
+
+export const generateTransactionId = (): string => generateUniqueId('trx');
+export const generateCartItemId = (): string => generateUniqueId('cart');
+export const generateSyncActionId = (): string => generateUniqueId('sync');
+
 export const generateNextProductId = (products: Product[] = inMemoryProducts): string => {
+  const existingIds = new Set(products.map((p) => p.id));
   let maxNumber = 0;
   for (const p of products) {
     if (!p.id) continue;
-    const match = p.id.match(/^PRD-(\d+)$/i);
+    const match = p.id.match(/^PRD-(\d{1,10})(?:[-_].*)?$/i);
     if (match) {
       const num = parseInt(match[1], 10);
       if (!isNaN(num) && num > maxNumber) {
@@ -129,13 +236,21 @@ export const generateNextProductId = (products: Product[] = inMemoryProducts): s
     }
   }
 
-  // If no PRD- format found, check length of existing products
+  // Coba sekuensial dulu (tetap enak dibaca), tapi WAJIB cek tabrakan
+  // (sebelumnya fallback products.length bisa duplikat setelah hapus data).
+  let candidate = maxNumber + 1;
+  // Jika tidak ada format PRD sama sekali (mis. sample prod-1..8),
+  // mulai dari panjang+1 namun tetap lewat loop cek di bawah.
   if (maxNumber === 0 && products.length > 0) {
-    maxNumber = products.length;
+    candidate = products.length + 1;
   }
-
-  const nextNum = maxNumber + 1;
-  return `PRD-${String(nextNum).padStart(6, '0')}`;
+  for (let i = 0; i < 10000; i++) {
+    const id = `PRD-${String(candidate).padStart(6, '0')}`;
+    if (!existingIds.has(id)) return id;
+    candidate++;
+  }
+  // Fallback terakhir: timestamp+random (dijamin unik lintas device)
+  return generateUniqueId('PRD');
 };
 
 export const getUniqueUnits = (products: Product[] = inMemoryProducts): string[] => {
@@ -186,6 +301,7 @@ export const addOrUpdateProduct = (
       };
       products[index] = updatedProduct;
       inMemoryProducts = products;
+      persistProducts();
       syncService.enqueue('UPSERT_PRODUCT', updatedProduct);
       return { product: updatedProduct, isNew: false };
     }
@@ -211,6 +327,7 @@ export const addOrUpdateProduct = (
     };
     products[existingIndex] = updatedProduct;
     inMemoryProducts = products;
+    persistProducts();
     syncService.enqueue('UPSERT_PRODUCT', updatedProduct);
     return { product: updatedProduct, isNew: false };
   }
@@ -230,12 +347,14 @@ export const addOrUpdateProduct = (
 
   products.unshift(newProduct);
   inMemoryProducts = products;
+  persistProducts();
   syncService.enqueue('UPSERT_PRODUCT', newProduct);
   return { product: newProduct, isNew: true };
 };
 
 export const deleteProduct = (id: string): void => {
   inMemoryProducts = inMemoryProducts.filter((p) => p.id !== id);
+  persistProducts();
   syncService.enqueue('DELETE_PRODUCT', id);
 };
 
@@ -247,20 +366,25 @@ export const getTransactions = (): Transaction[] => {
 
 export const saveTransactionsListDirect = (transactions: Transaction[]): void => {
   inMemoryTransactions = transactions;
+  persistTransactions();
 };
 
 export const saveTransaction = (transaction: Transaction): void => {
+  // Idempotency: cegah duplikat akibat double-keypress / double-click.
+  if (inMemoryTransactions.some((t) => t.id === transaction.id)) return;
   const activeUser = getCurrentUser();
   const txWithCashier: Transaction = {
     ...transaction,
     cashierName: transaction.cashierName || activeUser?.name || 'Kasir',
   };
   inMemoryTransactions = [txWithCashier, ...inMemoryTransactions];
+  persistTransactions();
   syncService.enqueue('INSERT_TRANSACTION', txWithCashier);
 };
 
 export const deleteTransaction = (id: string): void => {
   inMemoryTransactions = inMemoryTransactions.filter((t) => t.id !== id);
+  persistTransactions();
   syncService.enqueue('DELETE_TRANSACTION', id);
 };
 
@@ -284,9 +408,18 @@ export const generateInvoiceNumber = (transactions: Transaction[] = inMemoryTran
     }
   });
 
-  const nextSeq = maxSeq + 1;
-  const seqPadded = String(nextSeq).padStart(3, '0');
-  return `${dayPrefix}${seqPadded}`;
+  // Loop cek eksistensi: cegah duplikat saat 2 transaksi dibuat dalam 1 render
+  // sebelum state ter-refresh. CATATAN: sekuens harian tetap lokal per device;
+  // id transaksi (UUID) yang menjadi kunci unik lintas device, bukan invoiceNo.
+  const existing = new Set(transactions.map((t) => t.invoiceNo));
+  let nextSeq = maxSeq + 1;
+  for (let i = 0; i < 10000; i++) {
+    const candidate = `${dayPrefix}${String(nextSeq).padStart(3, '0')}`;
+    if (!existing.has(candidate)) return candidate;
+    nextSeq++;
+  }
+  // Fallback sangat jarang: tambah suffix random agar tetap unik di layar
+  return `${dayPrefix}${String(nextSeq).padStart(3, '0')}-${Math.random().toString(36).slice(2, 4).toUpperCase()}`;
 };
 
 // --- STORE PROFILE ---
@@ -297,6 +430,7 @@ export const getStoreProfile = (): StoreProfile => {
 
 export const saveStoreProfileDirect = (profile: StoreProfile): void => {
   inMemoryStoreProfile = { ...DEFAULT_STORE_PROFILE, ...profile };
+  persistProfile();
 };
 
 export const saveStoreProfile = (profile: StoreProfile): void => {
@@ -312,12 +446,30 @@ export const getUsers = (): UserAccount[] => {
 
 export const saveUsers = (users: UserAccount[]): void => {
   inMemoryUsers = users;
+  persistUsers();
+};
+
+// Gate klien untuk aksi admin. BUKAN pengganti otorisasi server
+// (token frontend = publik), tapi mencegah kasir mengubah user
+// lewat UI normal + mencegah kesalahan pemakaian API.
+const assertAdminSession = (): void => {
+  const caller = getActiveSessionUser();
+  // Bootstrap tanpa sesi (mis. seed awal) tetap diizinkan;
+  // setelah ada sesi aktif, wajib admin.
+  if (caller && caller.role !== 'admin') {
+    throw {
+      code: 'FORBIDDEN',
+      messageId: 'Hanya Administrator yang boleh mengelola pengguna.',
+      messageEn: 'Only administrators can manage users.',
+    };
+  }
 };
 
 export const addOrUpdateUser = (
   userData: { username: string; password?: string; name: string; role: 'admin' | 'kasir' },
   id?: number | string
 ): UserAccount => {
+  assertAdminSession();
   const users = [...inMemoryUsers];
   const now = new Date().toISOString();
 
@@ -335,6 +487,7 @@ export const addOrUpdateUser = (
       };
       users[idx] = updated;
       inMemoryUsers = users;
+      persistUsers();
       syncService.enqueue('UPSERT_USER', updated);
       return updated;
     }
@@ -355,16 +508,21 @@ export const addOrUpdateUser = (
     };
     users[existingIdx] = updated;
     inMemoryUsers = users;
+    persistUsers();
     syncService.enqueue('UPSERT_USER', updated);
     return updated;
   }
 
-  // Calculate next integer auto-increment ID
+  // ID integer unik anti-tabrakan: max+1 dengan loop cek eksistensi
+  // (sebelumnya users.length+1 bisa duplikat setelah hapus / id string).
+  const takenIds = new Set(users.map((u) => String(u.id)));
   const maxIntId = users.reduce((max, u) => {
     const n = Number(u.id);
-    return !isNaN(n) && n > max ? n : max;
+    return !isNaN(n) && Number.isInteger(n) && n > max ? n : max;
   }, 0);
-  const nextId = maxIntId > 0 ? maxIntId + 1 : (users.length + 1);
+  let nextId: number = maxIntId + 1;
+  if (maxIntId <= 0) nextId = users.length + 1;
+  while (takenIds.has(String(nextId))) nextId++;
 
   const newUser: UserAccount = {
     id: nextId,
@@ -378,11 +536,17 @@ export const addOrUpdateUser = (
 
   users.push(newUser);
   inMemoryUsers = users;
+  persistUsers();
   syncService.enqueue('UPSERT_USER', newUser);
   return newUser;
 };
 
 export const deleteUser = (id: number | string): boolean => {
+  try {
+    assertAdminSession();
+  } catch {
+    return false;
+  }
   const users = [...inMemoryUsers];
   const target = users.find((u) => String(u.id) === String(id));
   if (!target) return false;
@@ -393,6 +557,7 @@ export const deleteUser = (id: number | string): boolean => {
   }
 
   inMemoryUsers = users.filter((u) => String(u.id) !== String(id));
+  persistUsers();
   syncService.enqueue('DELETE_USER', id);
   return true;
 };
@@ -428,16 +593,33 @@ export const importDataJSON = (jsonStr: string): boolean => {
   try {
     const data = JSON.parse(jsonStr);
     if (data.products && Array.isArray(data.products)) {
-      inMemoryProducts = data.products;
+      const valid = (data.products as unknown[]).filter(
+        (p): p is Product => Boolean(p) && typeof (p as Product).id === 'string' && typeof (p as Product).name === 'string'
+      );
+      inMemoryProducts = valid;
+      persistProducts();
     }
-    if (data.profile) {
+    if (data.profile && typeof data.profile === 'object') {
       inMemoryStoreProfile = { ...DEFAULT_STORE_PROFILE, ...data.profile };
+      persistProfile();
     }
     if (data.transactions && Array.isArray(data.transactions)) {
-      inMemoryTransactions = data.transactions;
+      const valid = (data.transactions as unknown[]).filter(
+        (t): t is Transaction => Boolean(t) && typeof (t as Transaction).id === 'string'
+      );
+      inMemoryTransactions = valid;
+      persistTransactions();
     }
     if (data.users && Array.isArray(data.users)) {
-      inMemoryUsers = data.users;
+      const valid = (data.users as unknown[]).filter(
+        (u): u is UserAccount => Boolean(u) && typeof (u as UserAccount).username === 'string' && typeof (u as UserAccount).password === 'string'
+      );
+      if (valid.length > 0) {
+        // Jangan biarkan import mengunci sistem tanpa admin
+        const hasAdmin = valid.some((u) => u.role === 'admin');
+        inMemoryUsers = hasAdmin ? valid : [...valid, ...DEFAULT_USERS.filter((d) => d.role === 'admin')];
+        persistUsers();
+      }
     }
     syncService.uploadAllLocalDataToTurso();
     return true;

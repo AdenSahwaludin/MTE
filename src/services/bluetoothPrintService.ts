@@ -185,15 +185,14 @@ export async function connectBluetoothPrinter(): Promise<PrinterConnection> {
     throw new Error('Browser ini tidak mendukung Web Bluetooth. Buka di Google Chrome (Android/PC) dan pastikan Bluetooth aktif.');
   }
 
-  // Reuse cached connection if still active
+  // Reuse cached connection if still active. Tidak pakai probe write 0 byte —
+  // sebagian firmware printer merespons aneh terhadap write kosong. Kalau
+  // koneksi ternyata sudah basi, sendBytes gagal, cache dibuang (lihat
+  // printDirectBluetooth) dan percobaan berikutnya konek fresh.
   if (cachedConnection?.server?.connected) {
-    try {
-      await cachedConnection.characteristic.writeValue(new Uint8Array([]));
-      return cachedConnection;
-    } catch {
-      cachedConnection = null;
-    }
+    return cachedConnection;
   }
+  cachedConnection = null;
 
   // Request Bluetooth device pairing dialog
   const device = await (navigator as any).bluetooth.requestDevice({
@@ -301,5 +300,12 @@ export async function printDirectBluetooth(
 ): Promise<void> {
   const connection = await connectBluetoothPrinter();
   const receiptBytes = buildReceiptBytes(transaction, storeProfile);
-  await sendBytes(connection.characteristic, receiptBytes);
+  try {
+    await sendBytes(connection.characteristic, receiptBytes);
+  } catch (err) {
+    // Koneksi cache kemungkinan sudah basi (event gattserverdisconnected
+    // kadang terlambat) — buang supaya percobaan berikutnya konek fresh.
+    cachedConnection = null;
+    throw err;
+  }
 }

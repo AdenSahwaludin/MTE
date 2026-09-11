@@ -15,6 +15,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Build native lokal (Xcode derived data + hasil packaging IPA)
+build/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -26,7 +26,24 @@ Membuat aplikasi iOS **wajib** memakai macOS + Xcode. Pilihan:
 2. **Sewa cloud Mac** (MacStadium, dll), atau
 3. **GitHub Actions** dengan runner `macos-*` untuk build CI.
 
-### Langkah build
+### Build TANPA Mac: GitHub Actions (otomatis)
+
+Repo ini punya workflow `.github/workflows/build-ios.yml` (mirip `build-apk.yml`):
+setiap push ke `main` (atau manual via tab **Actions → Build iOS IPA → Run
+workflow**) akan membuild web, sync Capacitor, lalu menjalankan `xcodebuild`
+di runner macOS dan mengemas hasilnya menjadi **`Mega-Teknik-POS-iOS-unsigned.ipa`**.
+
+Cara mengambil filenya:
+
+1. Buka `github.com/AdenSahwaludin/MTE` → tab **Actions** → pilih run **Build iOS IPA**.
+2. Di bagian bawah (Artifacts) unduh **Mega-Teknik-POS-iOS-unsigned-IPA**.
+3. `.ipa`-nya **belum bertanda tangan** (unsigned). Cara pasang ke iPhone:
+   - Gratis: tanda tangan pakai **Sideloadly** atau **AltStore** dengan Apple ID
+     biasa (berlaku 7 hari, harus install ulang setelahnya), atau
+   - Resmi: gabung **Apple Developer Program** ($99/tahun) lalu sign + pasang via
+     TestFlight / Xcode.
+
+### Langkah build di Mac (alternatif)
 
 ```bash
 # 1. Di Linux / mana saja: build web + sinkron ke iOS

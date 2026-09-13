@@ -1,11 +1,15 @@
 export const formatRupiah = (value: number | string): string => {
   const num = typeof value === 'string' ? parseFloat(value) || 0 : value;
+  // Intl currency menyisipkan NBSP (U+00A0) setelah "Rp" — printer thermal
+  // mencetaknya sebagai glyph sampah (0xC2 0xA0). Ganti spasi biasa.
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(num);
+  })
+    .format(num)
+    .replace(/\u00A0/g, ' ');
 };
 
 export const formatNumber = (value: number | string): string => {

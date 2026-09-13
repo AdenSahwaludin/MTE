@@ -26,7 +26,17 @@ const LINE_WIDTH = 32;
 const textEncoder = new TextEncoder();
 
 function encodeText(text: string): number[] {
-  return Array.from(textEncoder.encode(text));
+  // Printer thermal 58mm hanya paham codepage ASCII — karakter Unicode
+  // (NBSP, kutip tipografis, dll) tercetak sebagai glyph sampah. Normalisasi
+  // ke ASCII yang aman dicetak.
+  const clean = text
+    .replace(/[\u00A0\u202F\u2000-\u200A\u3000]/g, ' ')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/[^\x20-\x7E]/g, '');
+  return Array.from(textEncoder.encode(clean));
 }
 
 function formatTwoColumns(left: string, right: string, width = LINE_WIDTH): string {

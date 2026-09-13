@@ -308,17 +308,8 @@ export async function printDirectBluetooth(
   transaction: Transaction,
   storeProfile: StoreProfile
 ): Promise<void> {
-  const receiptBytes = buildReceiptBytes(transaction, storeProfile);
-
-  /* Jembatan cetak lokal (Linux PC): BLE langsung tanpa BlueZ D-Bus.
-   * Bluetooth tetap dual-mode sehingga headset musik tetap jalan.
-   * Kalau bridge tidak hidup, lanjut jalur Web Bluetooth biasa. */
-  if (await probeLocalBridge()) {
-    await printViaLocalBridge(receiptBytes);
-    return;
-  }
-
   const connection = await connectBluetoothPrinter();
+  const receiptBytes = buildReceiptBytes(transaction, storeProfile);
   try {
     await sendBytes(connection.characteristic, receiptBytes);
   } catch (err) {
@@ -326,45 +317,5 @@ export async function printDirectBluetooth(
     // kadang terlambat) — buang supaya percobaan berikutnya konek fresh.
     cachedConnection = null;
     throw err;
-  }
-}
-
-/* ---------- Jembatan cetak lokal (tools/print-bridge.js) ---------- */
-
-const LOCAL_BRIDGE_URL = 'http://127.0.0.1:9211';
-let bridgeProbe: Promise<boolean> | null = null;
-
-function probeLocalBridge(): Promise<boolean> {
-  if (!bridgeProbe) {
-    bridgeProbe = (async () => {
-      try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 800);
-        const res = await fetch(`${LOCAL_BRIDGE_URL}/ping`, { signal: ctrl.signal });
-        clearTimeout(t);
-        return res.ok;
-      } catch {
-        return false;
-      }
-    })();
-  }
-  return bridgeProbe;
-}
-
-async function printViaLocalBridge(receiptBytes: Uint8Array): Promise<void> {
-  let b64 = '';
-  const CHUNK = 0x8000;
-  for (let i = 0; i < receiptBytes.length; i += CHUNK) {
-    b64 += btoa(String.fromCharCode(...receiptBytes.subarray(i, i + CHUNK)));
-  }
-  const res = await fetch(`${LOCAL_BRIDGE_URL}/print`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: b64,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.ok === false) {
-    bridgeProbe = null; /* bridge sempat gagal — probe ulang di percobaan berikutnya */
-    throw new Error(data.log || data.error || 'Jembatan cetak lokal gagal.');
   }
 }

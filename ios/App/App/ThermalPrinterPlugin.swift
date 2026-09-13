@@ -12,13 +12,12 @@ import UIKit
  * Xprinter, dll) yang punya mode BLE.
  *
  * Nama plugin & method dibuat sama persis dengan versi Android
- * (listPaired / print / disconnect / openRawBT) agar
+ * (listPaired / print / disconnect) agar
  * src/services/nativePrintService.ts bisa dipakai tanpa perubahan.
  * Perbedaan perilaku yang wajar di iOS:
  * - "address" = identifier UUID CoreBluetooth (bukan MAC address).
  * - listPaired = hasil scan BLE singkat + printer yang pernah dipakai
  *   (iOS tidak punya daftar pairing sistem untuk BLE).
- * - openRawBT = share sheet berisi teks struk (RawBT hanya ada di Android).
  */
 @objc(ThermalPrinterPlugin)
 public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManagerDelegate, CBPeripheralDelegate {
@@ -29,7 +28,6 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManager
         CAPPluginMethod(name: "listPaired", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "print", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "disconnect", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "openRawBT", returnType: CAPPluginReturnPromise),
     ]
 
     private enum PrinterError: LocalizedError {
@@ -180,36 +178,6 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin, CBCentralManager
     @objc func disconnect(_ call: CAPPluginCall) {
         teardownConnection()
         call.resolve(["success": true])
-    }
-
-    @objc func openRawBT(_ call: CAPPluginCall) {
-        let text = call.getString("text") ?? ""
-        guard !text.isEmpty else {
-            call.reject("Teks struk kosong")
-            return
-        }
-        // RawBT tidak ada di iOS — fallback terdekat: share sheet berisi teks struk
-        // (bisa di-copy, dikirim via WhatsApp, atau dibuka di aplikasi cetak lain).
-        DispatchQueue.main.async {
-            guard let viewController = self.bridge?.viewController else {
-                call.reject("Tidak bisa membuka share sheet.")
-                return
-            }
-            let activity = UIActivityViewController(activityItems: [text], applicationActivities: nil)
-            if let popover = activity.popoverPresentationController {
-                popover.sourceView = viewController.view
-                popover.sourceRect = CGRect(
-                    x: viewController.view.bounds.midX,
-                    y: viewController.view.bounds.midY,
-                    width: 0,
-                    height: 0
-                )
-                popover.permittedArrowDirections = []
-            }
-            viewController.present(activity, animated: true) {
-                call.resolve(["success": true])
-            }
-        }
     }
 
     // MARK: - Orkestrasi

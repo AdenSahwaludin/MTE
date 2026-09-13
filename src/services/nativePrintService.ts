@@ -1,7 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { Transaction, StoreProfile } from '../types';
 import { buildReceiptBytes } from './bluetoothPrintService';
-import { generateReceiptPlainText } from './directPrintService';
 
 export interface PairedPrinter {
   name: string;
@@ -86,23 +85,4 @@ export async function printNativeDirect(
   const res = await plugin.print({ data: base64, address });
   if (res?.address) savePrinterAddress(res.address);
   return { address: res?.address || address, bytes: res?.bytes || bytes.length };
-}
-
-/**
- * Buka RawBT via intent NATIVE (bukan window.location.href yang diblokir WebView).
- * Fallback kalau print langsung gagal.
- */
-export async function openRawBTNative(
-  transaction: Transaction,
-  storeProfile: StoreProfile
-): Promise<void> {
-  const plugin = getPlugin();
-  const plainText = generateReceiptPlainText(transaction, storeProfile);
-  if (plugin?.openRawBT) {
-    await plugin.openRawBT({ text: plainText });
-    return;
-  }
-  // Fallback web (Chrome / PWA)
-  const { printViaRawBT } = await import('./directPrintService');
-  printViaRawBT(transaction, storeProfile);
 }

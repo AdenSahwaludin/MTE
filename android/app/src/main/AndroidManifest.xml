@@ -36,14 +36,9 @@
         </provider>
     </application>
 
-    <!-- Queries for RawBT & Thermer packages -->
+    <!-- Queries for Thermer package -->
     <queries>
-        <package android:name="ru.a402d.rawbtprinter" />
         <package android:name="com.mate.thermer" />
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="rawbt" />
-        </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="thermer" />

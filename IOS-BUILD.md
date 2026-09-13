@@ -74,7 +74,6 @@ open ios/App/App.xcodeproj
 | Cetak Bluetooth | Bluetooth Classic SPP (UUID `00001101-...`) | **BLE (CoreBluetooth)** — iOS melarang SPP untuk aplikasi umum. Printer harus diaktifkan mode BLE-nya (umumnya sudah otomatis). |
 | "Perangkat ter-pairing" | Daftar pairing sistem | Hasil scan BLE ±2,5 detik + riwayat printer yang pernah dipakai |
 | Alamat printer | MAC address | Identifier UUID CoreBluetooth (tersimpan otomatis di localStorage seperti Android) |
-| Fallback RawBT | Intent ke aplikasi RawBT | Share sheet berisi teks struk (RawBT tidak ada di iOS) |
 | Splash screen | `drawable/splash.png` | `Splash.imageset` + LaunchScreen storyboard |
 
 Setelah scan, pilih printer di Pengaturan — alamatnya otomatis tersimpan dan
@@ -98,7 +97,7 @@ node scripts/generate-ios-assets.mjs
   logika `print()` versi Java).
 - UI web memanggil plugin lewat `src/services/nativePrintService.ts`
   **tanpa perubahan apa pun** — nama plugin (`ThermalPrinter`) dan method
-  (`listPaired`, `print`, `disconnect`, `openRawBT`) dibuat identik.
+  (`listPaired`, `print`, `disconnect`) dibuat identik.
 - **Belum teruji di printer sungguhan** karena build iOS butuh Mac — saat
   pertama kali build di Xcode, uji cetak dengan printer VSC MP-58M Pro di
   mode BLE dan laporkan error yang muncul (log dari Xcode console).

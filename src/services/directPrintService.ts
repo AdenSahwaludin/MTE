@@ -1,8 +1,6 @@
 import { Transaction, StoreProfile } from '../types';
 import { formatRupiah, formatDateIndo } from '../utils/formatters';
 
-const LINE_WIDTH = 32;
-
 /**
  * Thermer Print Entry Schema for iOS (github.com/tussharmate/ios-thermer-custom-schema)
  */
@@ -42,96 +40,6 @@ export function formatTwoColumns(left: string, right: string, width = 30): strin
     return leftTrim + ' '.repeat(spaceNeeded) + rightTrim;
   }
   return `${leftTrim} ${rightTrim}`;
-}
-
-/**
- * Center-align a string within the specified width
- */
-function centerText(text: string, width = LINE_WIDTH): string {
-  if (!text) return '';
-  const trimmed = text.trim();
-  if (trimmed.length >= width) return trimmed.slice(0, width);
-  const leftPad = Math.floor((width - trimmed.length) / 2);
-  const rightPad = width - trimmed.length - leftPad;
-  return ' '.repeat(leftPad) + trimmed + ' '.repeat(rightPad);
-}
-
-/**
- * Generate 32-character plain text thermal receipt formatted for 58mm ESC/POS printers (RawBT)
- */
-export function generateReceiptPlainText(
-  transaction: Transaction,
-  storeProfile: StoreProfile
-): string {
-  const lines: string[] = [];
-  const divider = '-'.repeat(LINE_WIDTH);
-  const doubleDivider = '='.repeat(LINE_WIDTH);
-
-  // 1. Store Header
-  lines.push(centerText(storeProfile.name.toUpperCase()));
-  if (storeProfile.tagline) {
-    lines.push(centerText(storeProfile.tagline));
-  }
-  if (storeProfile.address) {
-    lines.push(centerText(storeProfile.address));
-  }
-  if (storeProfile.phone) {
-    lines.push(centerText(`Telp: ${storeProfile.phone}`));
-  }
-
-  lines.push(doubleDivider);
-
-  // 2. Metadata
-  lines.push(formatTwoColumns(`No: ${transaction.invoiceNo}`, '', LINE_WIDTH));
-  if (storeProfile.showDateTime) {
-    lines.push(formatTwoColumns('Tgl: ' + formatDateIndo(transaction.date), '', LINE_WIDTH));
-  }
-  if (storeProfile.showCashierName && storeProfile.cashierName) {
-    const cashierStr = `Kasir: ${storeProfile.cashierName}`;
-    const custStr = transaction.customerName ? `Plg: ${transaction.customerName}` : '';
-    if (custStr) {
-      lines.push(formatTwoColumns(cashierStr, custStr, LINE_WIDTH));
-    } else {
-      lines.push(cashierStr);
-    }
-  } else if (transaction.customerName) {
-    lines.push(`Plg: ${transaction.customerName}`);
-  }
-
-  lines.push(divider);
-
-  // 3. Items List
-  transaction.items.forEach((item) => {
-    lines.push(item.name);
-    const leftCol = ` ${item.qty} ${item.unit || 'pcs'} x ${formatRupiah(item.price)}`;
-    const rightCol = formatRupiah(item.subtotal);
-    lines.push(formatTwoColumns(leftCol, rightCol, LINE_WIDTH));
-  });
-
-  lines.push(divider);
-
-  // 4. Totals & Payment
-  lines.push(formatTwoColumns('TOTAL', formatRupiah(transaction.totalAmount), LINE_WIDTH));
-  lines.push(formatTwoColumns('TUNAI / BAYAR', formatRupiah(transaction.cashAmount), LINE_WIDTH));
-  lines.push(formatTwoColumns('KEMBALIAN', formatRupiah(Math.max(0, transaction.changeAmount)), LINE_WIDTH));
-
-  if (transaction.notes) {
-    lines.push(divider);
-    lines.push(`Catatan: ${transaction.notes}`);
-  }
-
-  lines.push(doubleDivider);
-
-  // 5. Store Footer Note
-  if (storeProfile.footerNote) {
-    lines.push(centerText(storeProfile.footerNote));
-  }
-  lines.push(centerText('*** TERIMA KASIH ***'));
-  lines.push('');
-  lines.push('');
-  lines.push('');
-
-  return lines.join('\n');
 }
 
 /**
@@ -230,42 +138,6 @@ export function generateThermerReceiptEntries(
   }
 
   return entriesMap;
-}
-
-/**
- * Encode string to Base64 safely with UTF-8 support
- */
-function utf8ToBase64(str: string): string {
-  return window.btoa(unescape(encodeURIComponent(str)));
-}
-
-/**
- * Send receipt directly to RawBT app on Android (via official intent / custom scheme)
- */
-export function printViaRawBT(
-  transaction: Transaction,
-  storeProfile: StoreProfile
-): boolean {
-  const plainText = generateReceiptPlainText(transaction, storeProfile);
-  const encodedText = encodeURIComponent(plainText);
-
-  // Official RawBT Intent & Scheme for plain text receipt:
-  // intent:[encodedText]#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;
-  const rawbtIntentUrl = `intent:${encodedText}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
-  const rawbtSchemeUrl = `rawbt:${encodedText}`;
-
-  try {
-    const isAndroid = /android/i.test(navigator.userAgent);
-    if (isAndroid) {
-      window.location.href = rawbtIntentUrl;
-    } else {
-      window.location.href = rawbtSchemeUrl;
-    }
-    return true;
-  } catch (err) {
-    console.error('Error triggering RawBT print:', err);
-    return false;
-  }
 }
 
 // Module-level cooldown lock to prevent duplicate BLE connection bursts on iOS

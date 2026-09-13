@@ -4,10 +4,8 @@ import { FormattedNumberInput } from './FormattedNumberInput';
 import { formatRupiah } from '../utils/formatters';
 import {
   X,
-  Printer,
   Save,
   Bluetooth,
-  Smartphone,
   Share2,
   CheckCircle2,
   AlertCircle,
@@ -35,8 +33,6 @@ export interface PaymentModalProps {
   onSaveOnly: () => void;
   onPrintBluetooth: () => void;
   isPrintingBt: boolean;
-  onPrintReceipt: () => void;
-  onPrintRawBT: () => void;
   onPrintThermer: () => void;
   storeProfile: StoreProfile;
 }
@@ -60,8 +56,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   onSaveOnly,
   onPrintBluetooth,
   isPrintingBt,
-  onPrintReceipt,
-  onPrintRawBT,
   onPrintThermer,
 }) => {
   const cashInputRef = useRef<HTMLInputElement>(null);
@@ -74,11 +68,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
-      } else if (e.key === 'F2') {
-        e.preventDefault();
-        if (!isInsufficientCash) {
-          onPrintReceipt();
-        }
       } else if (e.key === 'F3') {
         e.preventDefault();
         if (!isInsufficientCash) {
@@ -89,7 +78,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isInsufficientCash, onPrintReceipt, onSaveOnly, onClose]);
+  }, [isOpen, isInsufficientCash, onSaveOnly, onClose]);
 
   // Focus cash input on desktop when modal opens
   useEffect(() => {
@@ -262,19 +251,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             </button>
 
-            {/* Secondary Action Grid: Browser Print & Save Only */}
+            {/* Secondary Action Grid: Save Only & Thermer iOS */}
             <div className="action-buttons-grid">
-              <button
-                type="button"
-                className="btn-primary-print"
-                onClick={onPrintReceipt}
-                disabled={isInsufficientCash}
-                title="Cetak struk via dialog browser / PC / USB (F2)"
-              >
-                <Printer size={17} />
-                <span>Cetak Browser<span className="btn-shortcut-tag"> (F2)</span></span>
-              </button>
-
               <button
                 type="button"
                 className="btn-primary-save-only"
@@ -285,20 +263,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <Save size={17} />
                 <span>Simpan Saja<span className="btn-shortcut-tag"> (F3)</span></span>
               </button>
-            </div>
 
-            {/* Helper Apps Grid */}
-            <div className="direct-buttons-row">
-              <button
-                type="button"
-                className="btn-direct-app rawbt"
-                onClick={onPrintRawBT}
-                disabled={isInsufficientCash}
-                title="Cetak via RawBT Android"
-              >
-                <Smartphone size={14} />
-                <span>RawBT (Android)</span>
-              </button>
               <button
                 type="button"
                 className="btn-direct-app thermer"

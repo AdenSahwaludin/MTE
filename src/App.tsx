@@ -15,7 +15,6 @@ import { KasirView } from './components/KasirView';
 import { ProductListView } from './components/ProductListView';
 import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
-import { ThermalReceipt } from './components/ThermalReceipt';
 import { InstallBanner, OfflineBanner } from './components/PwaBanners';
 import { SplashScreen } from './components/SplashScreen';
 import { LoginView } from './components/LoginView';
@@ -44,7 +43,6 @@ export const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [storeProfile, setStoreProfile] = useState<StoreProfile>(getStoreProfile());
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [printTransaction, setPrintTransaction] = useState<Transaction | null>(null);
 
   const loadData = useCallback(() => {
     setProducts(getProducts());
@@ -142,13 +140,6 @@ export const App: React.FC = () => {
     setStoreProfile(newProfile);
   };
 
-  const handlePrintReceipt = (trx: Transaction) => {
-    setPrintTransaction(trx);
-    setTimeout(() => {
-      window.print();
-    }, 100);
-  };
-
   const handlePreviewSplash = () => {
     setIsSplashPreview(true);
     setShowSplash(true);
@@ -173,11 +164,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      <ThermalReceipt
-        transaction={printTransaction}
-        storeProfile={storeProfile}
-      />
-
       <div className="app-container no-print">
         <OfflineBanner />
 
@@ -196,7 +182,6 @@ export const App: React.FC = () => {
               storeProfile={storeProfile}
               onProductUpdated={handleProductUpdated}
               onTransactionCreated={handleTransactionUpdated}
-              onPrintReceipt={handlePrintReceipt}
               showToast={showToast}
             />
           )}
@@ -214,7 +199,6 @@ export const App: React.FC = () => {
               transactions={transactions}
               storeProfile={storeProfile}
               onRefresh={handleTransactionUpdated}
-              onPrintReceipt={handlePrintReceipt}
               showToast={showToast}
             />
           )}

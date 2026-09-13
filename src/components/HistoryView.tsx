@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
 import { Transaction, StoreProfile } from '../types';
 import { deleteTransaction } from '../services/storageService';
-import { printViaRawBT, printViaThermer } from '../services/directPrintService';
+import { printViaThermer } from '../services/directPrintService';
 import { printDirectBluetooth } from '../services/bluetoothPrintService';
 import {
   isNativePrinterAvailable,
   printNativeDirect,
-  openRawBTNative,
 } from '../services/nativePrintService';
 import { formatRupiah, formatDateIndo } from '../utils/formatters';
 import {
   History,
-  Printer,
   Trash2,
   Calendar,
   DollarSign,
@@ -19,7 +17,6 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
-  Smartphone,
   Share2,
   Bluetooth,
 } from 'lucide-react';
@@ -28,7 +25,6 @@ interface HistoryViewProps {
   transactions: Transaction[];
   storeProfile: StoreProfile;
   onRefresh: () => void;
-  onPrintReceipt: (trx: Transaction) => void;
   showToast: (msg: string, type?: 'success' | 'info') => void;
 }
 
@@ -36,7 +32,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
   transactions,
   storeProfile,
   onRefresh,
-  onPrintReceipt,
   showToast,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -85,26 +80,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     } finally {
       setIsPrintingBtId(null);
     }
-  };
-
-  const handleReprint = (t: Transaction) => {
-    showToast(`Mencetak ulang struk ${t.invoiceNo}...`, 'info');
-    onPrintReceipt(t);
-  };
-
-  const handleReprintRawBT = async (t: Transaction) => {
-    if (isNativePrinterAvailable()) {
-      try {
-        showToast(`Mengirim ulang ke RawBT (${t.invoiceNo})...`, 'success');
-        await openRawBTNative(t, storeProfile);
-        return;
-      } catch (err: any) {
-        showToast(err?.message || 'Gagal buka RawBT.', 'info');
-        return;
-      }
-    }
-    showToast(`Mengirim ulang ke RawBT Android (${t.invoiceNo})...`, 'success');
-    printViaRawBT(t, storeProfile);
   };
 
   const handleReprintThermer = (t: Transaction) => {
@@ -263,15 +238,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                             </button>
                             <button
                               type="button"
-                              className="btn-icon-action"
-                              style={{ color: '#059669', borderColor: '#a7f3d0' }}
-                              onClick={() => handleReprint(t)}
-                              title="Cetak Ulang Struk (Browser)"
-                            >
-                              <Printer size={15} />
-                            </button>
-                            <button
-                              type="button"
                               className="btn-icon-action delete"
                               onClick={() => handleDelete(t.id, t.invoiceNo)}
                               title="Hapus Riwayat"
@@ -312,22 +278,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                                     title="Cetak langsung via Bluetooth (Android Chrome / PC)"
                                   >
                                     <Bluetooth size={13} className={isPrintingBtId === t.id ? 'animate-spin' : ''} /> {isPrintingBtId === t.id ? 'Menghubungkan...' : 'Bluetooth (Android)'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReprint(t)}
-                                    className="btn-outline"
-                                    style={{ padding: '4px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                                  >
-                                    <Printer size={13} /> Cetak Browser
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReprintRawBT(t)}
-                                    className="btn-history-rawbt"
-                                    title="Cetak ulang langsung via RawBT (Android)"
-                                  >
-                                    <Smartphone size={13} /> RawBT (Android)
                                   </button>
                                   <button
                                     type="button"

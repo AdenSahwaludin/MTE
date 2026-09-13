@@ -407,7 +407,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <label style={{ fontWeight: 700 }}>Printer Bluetooth (APK Langsung, 58mm)</label>
               {!isNativePrinter ? (
                 <p style={{ fontSize: '0.82rem', color: '#475569', margin: '6px 0 0 0' }}>
-                  Mode browser: pakai tombol RawBT / Bluetooth di menu Kasir. Install APK terbaru untuk print langsung tanpa aplikasi tambahan.
+                  Mode browser: pakai tombol Bluetooth di menu Kasir. Install APK terbaru untuk print langsung tanpa aplikasi tambahan.
                 </p>
               ) : (
                 <>

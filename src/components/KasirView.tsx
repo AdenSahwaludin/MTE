@@ -9,12 +9,11 @@ import {
   generateCartItemId,
   getCurrentUser,
 } from '../services/storageService';
-import { printViaRawBT, printViaThermer } from '../services/directPrintService';
+import { printViaThermer } from '../services/directPrintService';
 import { printDirectBluetooth } from '../services/bluetoothPrintService';
 import {
   isNativePrinterAvailable,
   printNativeDirect,
-  openRawBTNative,
 } from '../services/nativePrintService';
 import { syncService } from '../services/syncService';
 import { AutocompleteInput } from './AutocompleteInput';
@@ -38,7 +37,6 @@ interface KasirViewProps {
   storeProfile: StoreProfile;
   onProductUpdated: () => void;
   onTransactionCreated?: () => void;
-  onPrintReceipt: (trx: Transaction) => void;
   showToast: (msg: string, type?: 'success' | 'info') => void;
 }
 
@@ -46,7 +44,6 @@ export const KasirView: React.FC<KasirViewProps> = ({
   storeProfile,
   onProductUpdated,
   onTransactionCreated,
-  onPrintReceipt,
   showToast,
 }) => {
   // Input fields for current item
@@ -489,7 +486,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       const msg: string = err?.message || 'Gagal koneksi Bluetooth.';
       // Pesan khusus kalau Web Bluetooth tidak didukung (artinya lagi di APK lama / WebView)
       if (msg.includes('tidak mendukung Web Bluetooth') || msg.includes('GATT')) {
-        showToast(`Transaksi ${trx.invoiceNo} sudah tersimpan. Web Bluetooth tidak didukung di sini — pakai RawBT (Android) / Thermer (iOS), atau cetak ulang dari Riwayat.`, 'info');
+        showToast(`Transaksi ${trx.invoiceNo} sudah tersimpan. Web Bluetooth tidak didukung di sini — pakai Thermer (iOS), atau cetak ulang dari Riwayat.`, 'info');
       } else {
         showToast(`Transaksi ${trx.invoiceNo} sudah tersimpan. Cetak gagal: ${msg} Periksa printer, lalu cetak ulang dari Riwayat.`, 'info');
       }
@@ -499,55 +496,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     }
   };
 
-  // 3. Standard Browser Print (PC / Desktop / USB)
-  const handlePrintReceipt = () => {
-    if (!tryBeginTx()) return;
-    try {
-      const trx = createCurrentTransaction();
-      if (!trx) return;
-
-      showToast('Memproses cetak struk browser...', 'success');
-      onPrintReceipt(trx);
-      handleResetTransaction();
-    } finally {
-      endTxSoon();
-    }
-  };
-
-  // 4. Direct RawBT Print (Android Companion App / Native Intent di APK)
-  const handlePrintRawBT = async () => {
-    if (!tryBeginTx()) return;
-    try {
-      const trx = createCurrentTransaction();
-      if (!trx) return;
-
-      // Di APK baru: kirim via intent native (tidak diblokir WebView)
-      if (isNativePrinterAvailable()) {
-        try {
-          showToast('Membuka RawBT...', 'success');
-          await openRawBTNative(trx, storeProfile);
-          handleResetTransaction();
-          return;
-        } catch (err: any) {
-          // Transaksi sudah tersimpan — reset keranjang agar retry tidak
-          // membuat transaksi dobel. Cetak ulang lewat Riwayat.
-          handleResetTransaction();
-          showToast(`Transaksi ${trx.invoiceNo} sudah tersimpan. ${err?.message || 'Gagal buka RawBT. Pastikan aplikasi RawBT terinstall.'} Cetak ulang dari Riwayat.`, 'info');
-          return;
-        }
-      }
-
-      // URL intent tidak bisa dikonfirmasi dari web (RawBT fire-and-forget) —
-      // toast dibuat jujur + arahan, bukan klaim sukses.
-      showToast('Mengirim ke RawBT… jika struk tidak tercetak, install aplikasi RawBT (Play Store) lalu cetak ulang dari Riwayat.', 'info');
-      printViaRawBT(trx, storeProfile);
-      handleResetTransaction();
-    } finally {
-      endTxSoon();
-    }
-  };
-
-  // 5. Direct Thermer Print (iOS Companion App)
+  // 3. Direct Thermer Print (iOS Companion App)
   const handlePrintThermer = () => {
     if (!tryBeginTx()) return;
     try {
@@ -865,8 +814,6 @@ export const KasirView: React.FC<KasirViewProps> = ({
         onSaveOnly={handleSaveOnlyTransaction}
         onPrintBluetooth={handlePrintBluetooth}
         isPrintingBt={isPrintingBt}
-        onPrintReceipt={handlePrintReceipt}
-        onPrintRawBT={handlePrintRawBT}
         onPrintThermer={handlePrintThermer}
         storeProfile={storeProfile}
       />

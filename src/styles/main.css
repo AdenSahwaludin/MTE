@@ -1513,47 +1513,11 @@ button,
   opacity: 0.9;
 }
 
-/* Action Buttons Grid (Cetak Browser & Simpan Saja) */
+/* Action Buttons Grid (Simpan Saja & Thermer) */
 .action-buttons-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
-}
-
-.btn-primary-print {
-  min-height: 44px;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  color: #ffffff !important;
-  border: none;
-  border-radius: 10px;
-  font-size: 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
-  touch-action: manipulation;
-  transition: all 0.15s ease;
-  padding: 0.5rem 0.85rem;
-}
-
-.btn-primary-print:hover:not(:disabled) {
-  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
-  transform: translateY(-1px);
-}
-
-.btn-primary-print:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.btn-primary-print:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: #94a3b8;
-  box-shadow: none;
 }
 
 .btn-primary-save-only {
@@ -1599,13 +1563,7 @@ button,
   margin-left: 2px;
 }
 
-/* Helper Apps (RawBT & Thermer) */
-.direct-buttons-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.45rem;
-}
-
+/* Helper Apps (Thermer) */
 .btn-direct-app {
   display: flex;
   align-items: center;
@@ -1623,17 +1581,6 @@ button,
   transition: all 0.15s ease;
   touch-action: manipulation;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-}
-
-.btn-direct-app.rawbt {
-  color: #15803d;
-  border-color: #86efac;
-  background: #f0fdf4;
-}
-
-.btn-direct-app.rawbt:hover:not(:disabled) {
-  background: #dcfce7;
-  border-color: #4ade80;
 }
 
 .btn-direct-app.thermer {
@@ -2693,7 +2640,7 @@ button,
 }
 
 /* =========================================================
-   DIRECT BLUETOOTH THERMAL PRINT BUTTONS (RawBT & Thermer)
+   DIRECT BLUETOOTH THERMAL PRINT BUTTONS (Thermer)
    ========================================================= */
 
 .direct-print-wrapper {
@@ -2728,39 +2675,6 @@ button,
   .direct-buttons-grid {
     grid-template-columns: 1fr;
   }
-}
-
-/* Direct RawBT Button (Android) */
-.btn-direct-rawbt {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.65rem 0.85rem;
-  background: linear-gradient(135deg, #059669, #10b981);
-  color: #ffffff;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
-  transition: all 0.2s ease;
-  text-align: left;
-}
-
-.btn-direct-rawbt:hover:not(:disabled) {
-  background: linear-gradient(135deg, #047857, #059669);
-  box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
-  transform: translateY(-1px);
-}
-
-.btn-direct-rawbt:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.btn-direct-rawbt:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: #94a3b8;
-  box-shadow: none;
 }
 
 /* Direct Thermer Button (iOS) */
@@ -2840,26 +2754,6 @@ button,
 }
 
 /* History view mini action buttons */
-.btn-history-rawbt {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #047857;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-history-rawbt:hover {
-  background: #d1fae5;
-  border-color: #6ee7b7;
-}
-
 .btn-history-thermer {
   display: inline-flex;
   align-items: center;

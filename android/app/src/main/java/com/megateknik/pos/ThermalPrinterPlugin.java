@@ -4,9 +4,7 @@ import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
-import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Build;
 import android.util.Base64;
 
@@ -250,23 +248,5 @@ public class ThermalPrinterPlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("success", true);
         call.resolve(ret);
-    }
-
-    @PluginMethod
-    public void openRawBT(PluginCall call) {
-        String text = call.getString("text", "");
-        try {
-            String encoded = Uri.encode(text);
-            // Intent resmi RawBT: intent:[teks]#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;
-            String uriStr = "intent:" + encoded + "#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;";
-            Intent intent = Intent.parseUri(uriStr, Intent.URI_INTENT_SCHEME);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getActivity().startActivity(intent);
-            JSObject ret = new JSObject();
-            ret.put("success", true);
-            call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal buka RawBT. Pastikan aplikasi RawBT terinstall. " + e.getMessage());
-        }
     }
 }

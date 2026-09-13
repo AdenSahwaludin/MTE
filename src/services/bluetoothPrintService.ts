@@ -214,18 +214,7 @@ export async function connectBluetoothPrinter(): Promise<PrinterConnection> {
     throw new Error('Bluetooth GATT tidak tersedia di perangkat ini');
   }
 
-  let server;
-  try {
-    server = await device.gatt.connect();
-  } catch (err: any) {
-    /* Di situs publik (https), Chrome butuh izin "Local Network Access"
-     * agar boleh menghubungi jembatan cetak lokal di 127.0.0.1. */
-    const hint =
-      typeof location !== 'undefined' && location.protocol === 'https:'
-        ? ' Beri izin "Local network access" untuk situs ini (ikon di address bar atau chrome://settings/content/localNetworkAccess), atau buka lewat localhost.'
-        : '';
-    throw new Error(`Koneksi GATT ke printer gagal (${err?.message || err}).${hint}`);
-  }
+  const server = await device.gatt.connect();
   let characteristic: any = null;
 
   for (const serviceUuid of PRINTER_SERVICE_UUIDS) {

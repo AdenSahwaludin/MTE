@@ -85,6 +85,22 @@
     margin-bottom: 2mm !important;
   }
 
+  .thermal-logo-wrap {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    margin-bottom: 1.5mm !important;
+  }
+
+  .thermal-logo-img {
+    width: 22mm !important;
+    max-height: 16mm !important;
+    object-fit: contain !important;
+    display: block !important;
+    margin: 0 auto !important;
+    filter: grayscale(100%) contrast(150%) !important;
+  }
+
   .thermal-store-name {
     font-size: 10.5px !important;
     font-weight: 700 !important;

@@ -15,6 +15,9 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ transaction, sto
       <div className="thermal-receipt-container">
         {/* Header Toko */}
         <div className="thermal-header">
+          <div className="thermal-logo-wrap">
+            <img src="/logo.webp" alt="Logo" className="thermal-logo-img" />
+          </div>
           <div className="thermal-store-name">{storeProfile.name}</div>
           {storeProfile.tagline && <div className="thermal-store-info">{storeProfile.tagline}</div>}
           <div className="thermal-store-info">{storeProfile.address}</div>
@@ -24,10 +27,11 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ transaction, sto
         <hr className="thermal-double-divider" />
 
         {/* Info Transaksi */}
-        <div className="thermal-meta-row">
-          <span>No: {transaction.invoiceNo}</span>
-          {storeProfile.showDateTime && <span>{formatDateIndo(transaction.date)}</span>}
-        </div>
+        {storeProfile.showDateTime && (
+          <div className="thermal-meta-row" style={{ justifyContent: 'center' }}>
+            <span>{formatDateIndo(transaction.date)}</span>
+          </div>
+        )}
         {storeProfile.showCashierName && (
           <div className="thermal-meta-row">
             <span>Kasir: {transaction.cashierName || storeProfile.cashierName}</span>

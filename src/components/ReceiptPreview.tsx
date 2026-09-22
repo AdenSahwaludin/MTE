@@ -42,6 +42,9 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
       <div className="paper-receipt">
         {/* Header Toko */}
         <div className="receipt-store-header">
+          <div className="receipt-logo-wrap">
+            <img src="/logo.webp" alt="Logo" className="receipt-logo-img" />
+          </div>
           <div className="receipt-store-title">{storeProfile.name}</div>
           {storeProfile.tagline && <div className="receipt-store-desc">{storeProfile.tagline}</div>}
           <div className="receipt-store-desc">{storeProfile.address}</div>
@@ -51,14 +54,20 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
         <hr className="receipt-double-divider" />
 
         {/* Metadata Struk */}
-        <div className="receipt-meta-row">
-          <span>No: {invoiceNo}</span>
-          {storeProfile.showDateTime && <span>{formatDateIndo(date)}</span>}
-        </div>
+        {storeProfile.showDateTime && (
+          <div className="receipt-meta-row" style={{ justifyContent: 'center' }}>
+            <span>{formatDateIndo(date)}</span>
+          </div>
+        )}
         {storeProfile.showCashierName && (
           <div className="receipt-meta-row">
             <span>Kasir: {cashierName || storeProfile.cashierName}</span>
             {customerName && <span>Plg: {customerName}</span>}
+          </div>
+        )}
+        {!storeProfile.showCashierName && customerName && (
+          <div className="receipt-meta-row">
+            <span>Plg: {customerName}</span>
           </div>
         )}
 

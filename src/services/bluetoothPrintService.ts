@@ -95,7 +95,6 @@ export function buildReceiptBytes(
 
   // 4. Metadata
   add(CMD.ALIGN_LEFT);
-  line(`No: ${transaction.invoiceNo}`);
   if (storeProfile.showDateTime) {
     line(`Tgl: ${formatDateIndo(transaction.date)}`);
   }

@@ -84,7 +84,6 @@ export function generateThermerReceiptEntries(
 
   // 3. METADATA TRANSAKSI (Digabung dengan pembatas 1 entry)
   const metaLines: string[] = ['------------------------------'];
-  metaLines.push(`No: ${transaction.invoiceNo}`);
   if (storeProfile.showDateTime) {
     metaLines.push(`Tgl: ${formatDateIndo(transaction.date)}`);
   }

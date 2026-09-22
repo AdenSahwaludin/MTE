@@ -1705,6 +1705,20 @@ button,
   margin-bottom: 0.5rem;
 }
 
+.receipt-logo-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.receipt-logo-img {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  display: block;
+}
+
 .receipt-store-title {
   font-size: 14px;
   font-weight: 900;

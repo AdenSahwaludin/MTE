@@ -876,10 +876,10 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 className="btn-primary-print"
                 onClick={handlePrintBluetooth}
                 disabled={cartItems.length === 0 || isPrintingBt}
-                title="Cetak langsung ke printer Bluetooth Thermal 58mm (F3)"
+                title="Cetak langsung struk ke printer Bluetooth (F3)"
               >
                 <Bluetooth size={19} className={isPrintingBt ? 'animate-spin' : ''} />
-                <span>{isPrintingBt ? 'Mencetak...' : 'Cetak 58mm'}<span className="btn-shortcut-tag"> (F3)</span></span>
+                <span>{isPrintingBt ? 'Mencetak...' : 'Cetak Struk'}<span className="btn-shortcut-tag"> (F3)</span></span>
               </button>
 
               <button
@@ -951,10 +951,10 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 className="btn-mobile-sticky-print"
                 onClick={handlePrintBluetooth}
                 disabled={isPrintingBt}
-                title="Cetak langsung ke printer Bluetooth 58mm"
+                title="Cetak langsung struk ke printer Bluetooth"
               >
                 <Bluetooth size={17} className={isPrintingBt ? 'animate-spin' : ''} />
-                <span>{isPrintingBt ? 'Mencetak...' : 'Cetak 58mm'}</span>
+                <span>{isPrintingBt ? 'Mencetak...' : 'Cetak Struk'}</span>
               </button>
             </div>
           </div>

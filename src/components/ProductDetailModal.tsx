@@ -78,9 +78,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Detail Produk</h3>
-              <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
-                Informasi lengkap data barang & pencarian
-              </p>
             </div>
           </div>
           <button className="modal-close-btn" onClick={onClose} title="Tutup">
@@ -112,7 +109,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {/* ID Produk */}
             <div className="detail-info-card">
               <div className="detail-card-label">
-                <Info size={13} color="#2563eb" /> ID Produk
+                <Info size={13} color="#2563eb" /> ID
               </div>
               <div className="detail-card-value-row">
                 <span className="detail-mono-id">{product.id}</span>
@@ -120,7 +117,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   type="button"
                   className="detail-copy-btn"
                   onClick={handleCopyId}
-                  title="Salin ID Produk"
+                  title="Salin ID"
                 >
                   {copiedId ? <Check size={13} color="#16a34a" /> : <Copy size={13} />}
                   <span>{copiedId ? 'Tersalin' : 'Salin'}</span>
@@ -131,11 +128,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {/* Dibuat Oleh */}
             <div className="detail-info-card">
               <div className="detail-card-label">
-                <User size={13} color="#0284c7" /> Dibuat Oleh
+                <User size={13} color="#0284c7" /> Pembuat
               </div>
               <div className="detail-card-value">
                 <span className="detail-creator-badge">
-                  {product.createdBy || 'Administrator / Kasir'}
+                  {product.createdBy || 'Administrator'}
                 </span>
               </div>
             </div>
@@ -143,7 +140,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {/* Satuan */}
             <div className="detail-info-card">
               <div className="detail-card-label">
-                <Package size={13} color="#059669" /> Satuan Barang
+                <Package size={13} color="#059669" /> Satuan
               </div>
               <div className="detail-card-value" style={{ fontWeight: 600, color: 'var(--text-main)' }}>
                 {product.unit || 'Pcs'}
@@ -164,7 +161,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {product.createdAt && (
               <div className="detail-info-card">
                 <div className="detail-card-label">
-                  <Calendar size={13} color="#64748b" /> Waktu Dibuat
+                  <Calendar size={13} color="#64748b" /> Dibuat
                 </div>
                 <div className="detail-card-value" style={{ fontSize: '0.8rem', color: '#475569' }}>
                   {formatDateIndo(product.createdAt)}
@@ -176,7 +173,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {product.updatedAt && (
               <div className="detail-info-card">
                 <div className="detail-card-label">
-                  <Clock size={13} color="#64748b" /> Terakhir Diubah
+                  <Clock size={13} color="#64748b" /> Diubah
                 </div>
                 <div className="detail-card-value" style={{ fontSize: '0.8rem', color: '#475569' }}>
                   {formatDateIndo(product.updatedAt)}
@@ -190,19 +187,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div className="detail-aliases-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-main)' }}>
                 <Tag size={15} color="#2563eb" />
-                <span>Nama Lain / Alias (Pencarian Cepat Kasir)</span>
+                <span>Nama Lain / Alias</span>
               </div>
               <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                {product.aliases && product.aliases.length > 0 ? `${product.aliases.length} Alias Terdaftar` : '0 Alias'}
+                {product.aliases && product.aliases.length > 0 ? `${product.aliases.length} Alias` : '0 Alias'}
               </span>
             </div>
-            
-            <p style={{ margin: '4px 0 10px 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4 }}>
-              Kata kunci sebutan lain yang otomatis dikenali mesin pencarian di halaman kasir untuk produk ini:
-            </p>
 
             {product.aliases && product.aliases.length > 0 ? (
-              <div className="detail-aliases-list">
+              <div className="detail-aliases-list" style={{ marginTop: '8px' }}>
                 {product.aliases.map((alias, idx) => (
                   <span key={idx} className="detail-alias-pill">
                     <Tag size={11} style={{ marginRight: '4px', opacity: 0.8 }} />
@@ -211,8 +204,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="detail-aliases-empty">
-                Belum ada nama lain / alias yang ditambahkan. Anda dapat menambahkan nama lain melalui menu <b>Edit Produk</b>.
+              <div className="detail-aliases-empty" style={{ marginTop: '8px' }}>
+                Belum ada nama lain / alias.
               </div>
             )}
           </div>
@@ -233,7 +226,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               Tutup
             </button>
             <button type="button" className="btn-primary" onClick={handleEditClick}>
-              <Edit2 size={15} /> Edit Produk
+              <Edit2 size={15} /> Edit
             </button>
           </div>
         </div>

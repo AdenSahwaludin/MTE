@@ -45,7 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onSelectTab('kasir')}
           >
             <ShoppingCart size={18} />
-            <span>Kasir & Struk</span>
+            <span>Kasir</span>
           </button>
 
           <button
@@ -54,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onSelectTab('products')}
           >
             <Package size={18} />
-            <span>Daftar Produk</span>
+            <span>Produk</span>
           </button>
 
           <button
@@ -63,7 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onSelectTab('history')}
           >
             <History size={18} />
-            <span>Riwayat Struk</span>
+            <span>Riwayat</span>
           </button>
 
           {isAdmin && (

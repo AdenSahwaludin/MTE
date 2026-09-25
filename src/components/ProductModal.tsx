@@ -104,7 +104,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-container" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>{productToEdit ? 'Edit Data Produk' : 'Tambah Produk Baru'}</h3>
+          <h3>{productToEdit ? 'Edit Produk' : 'Tambah Produk'}</h3>
           <button className="modal-close-btn" onClick={onClose} title="Tutup">
             <X size={20} />
           </button>
@@ -131,11 +131,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
             {/* Nama Produk Utama */}
             <div className="form-group">
-              <label>Nama Produk Utama *</label>
+              <label>Nama Produk *</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="Contoh: Kabel Eterna NYM 2 x 1.5mm"
+                placeholder="Nama produk..."
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -146,10 +146,10 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             {/* Nama Lain / Alias Produk */}
             <div className="form-group">
               <label>
-                <Tag size={13} color="#2563eb" /> Nama Lain / Alias Produk
+                <Tag size={13} color="#2563eb" /> Nama Lain / Alias
               </label>
               <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                Nama sebutan lain yang sering dicari kasir (misal: "Kabel Putih", "Kabel Listrik")
+                Pisahkan dengan koma atau Enter
               </span>
               <div className="alias-input-tag-box">
                 {aliases.map((alias, idx) => (
@@ -167,7 +167,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                 <input
                   type="text"
                   className="tag-input-field"
-                  placeholder={aliases.length === 0 ? 'Ketik nama lain lalu tekan Enter / Koma...' : 'Tambah nama lain...'}
+                  placeholder="Tambah nama lain..."
                   value={currentAliasInput}
                   onChange={(e) => {
                     if (e.target.value.includes(',')) {
@@ -194,7 +194,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
             {/* Harga & Satuan */}
             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '0.75rem' }}>
               <div className="form-group">
-                <label>Harga Satuan (Rp) *</label>
+                <label>Harga (Rp) *</label>
                 <div className="price-input-wrapper">
                   <span className="currency-prefix">Rp</span>
                   <FormattedNumberInput
@@ -207,11 +207,11 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               </div>
 
               <div className="form-group">
-                <label>Satuan Barang</label>
+                <label>Satuan</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Pcs, Meter, Rol, Dus..."
+                  placeholder="Pcs, Meter, Rol..."
                   value={unit}
                   onChange={(e) => setUnit(e.target.value)}
                   list="unit-db-list"
@@ -252,7 +252,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
 
             {/* Kategori */}
             <div className="form-group">
-              <label>Kategori Produk</label>
+              <label>Kategori</label>
               <input
                 type="text"
                 className="form-input"
@@ -300,7 +300,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
               Batal
             </button>
             <button type="submit" className="btn-primary">
-              {productToEdit ? 'Simpan Perubahan' : 'Tambah Produk'}
+              {productToEdit ? 'Simpan' : 'Tambah'}
             </button>
           </div>
         </form>

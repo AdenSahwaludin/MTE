@@ -19,7 +19,7 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
   onChange,
   onSelectProduct,
   onEnterWithoutMatch,
-  placeholder = 'Ketik nama barang atau nama lain/alias...',
+  placeholder = 'Nama barang / barcode...',
   autoFocus = false,
   inputRef,
 }) => {
@@ -184,9 +184,7 @@ export const AutocompleteInput: React.FC<AutocompleteInputProps> = ({
       {isNewItem && (
         <div className="autocomplete-inline-hint">
           <Sparkles size={13} color="#d97706" style={{ flexShrink: 0 }} />
-          <span>
-            Barang belum terdaftar. Menambahkan ini akan <strong>otomatis menyimpannya</strong> ke Master Produk.
-          </span>
+          <span>Barang baru (otomatis tersimpan ke produk)</span>
         </div>
       )}
     </div>

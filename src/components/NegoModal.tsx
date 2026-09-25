@@ -80,7 +80,7 @@ export const NegoModal: React.FC<NegoModalProps> = ({
         <div className="modal-header nego-modal-header">
           <div className="nego-modal-title">
             <Tag size={18} color="#2563eb" />
-            <span>Nego / Potongan Harga Barang</span>
+            <span>Nego Harga</span>
           </div>
           <button type="button" className="modal-close-btn" onClick={onClose} title="Tutup (Esc)">
             <X size={20} />
@@ -92,19 +92,19 @@ export const NegoModal: React.FC<NegoModalProps> = ({
           <div className="nego-item-info-card">
             <div className="nego-item-name">{item.name}</div>
             <div className="nego-item-meta">
-              <span>Jumlah: <strong>{item.qty} {item.unit || 'pcs'}</strong></span>
+              <span>Qty: <strong>{item.qty} {item.unit || 'pcs'}</strong></span>
               <span>•</span>
-              <span>Harga Normal: <strong>{formatRupiah(originalPrice)}</strong></span>
+              <span>Normal: <strong>{formatRupiah(originalPrice)}</strong></span>
             </div>
             <div className="nego-subtotal-normal">
-              Subtotal Normal: {formatRupiah(originalPrice * item.qty)}
+              Subtotal: {formatRupiah(originalPrice * item.qty)}
             </div>
           </div>
 
           {/* Form Input Harga Nego Baru */}
           <div className="form-group" style={{ marginBottom: '0.4rem' }}>
             <label className="nego-input-label">
-              Harga Satuan Baru yang Disepakati (Nego)
+              Harga Satuan Baru
             </label>
             <div className="price-input-wrapper">
               <span className="currency-prefix">Rp</span>
@@ -125,7 +125,7 @@ export const NegoModal: React.FC<NegoModalProps> = ({
 
           {/* Quick Discount Presets */}
           <div className="nego-quick-discounts">
-            <span className="nego-presets-label">Diskon Cepat:</span>
+            <span className="nego-presets-label">Diskon:</span>
             <div className="nego-presets-row">
               <button
                 type="button"
@@ -189,23 +189,23 @@ export const NegoModal: React.FC<NegoModalProps> = ({
                 <>
                   <div className="nego-calc-row">
                     <span className="nego-calc-label">
-                      <TrendingDown size={15} /> Potongan per {item.unit || 'pcs'}:
+                      <TrendingDown size={15} /> Potongan:
                     </span>
                     <span className="nego-calc-val">
                       -{formatRupiah(diffPerUnit)} ({discountPercent}%)
                     </span>
                   </div>
                   <div className="nego-calc-row total-saving">
-                    <span>Total Penghematan Pelanggan:</span>
+                    <span>Total Hemat:</span>
                     <span className="nego-saving-highlight">-{formatRupiah(totalDiff)}</span>
                   </div>
                   <div className="nego-calc-subtotal">
-                    Subtotal Nego Baru: <strong>{formatRupiah(currentNegoPrice * item.qty)}</strong>
+                    Subtotal Baru: <strong>{formatRupiah(currentNegoPrice * item.qty)}</strong>
                   </div>
                 </>
               ) : currentNegoPrice === originalPrice ? (
                 <div style={{ textAlign: 'center', fontSize: '0.82rem', color: '#64748b' }}>
-                  Harga sama dengan harga normal (tidak ada potongan/nego).
+                  Harga sama dengan harga normal.
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', fontSize: '0.82rem', color: '#b45309' }}>
@@ -225,7 +225,7 @@ export const NegoModal: React.FC<NegoModalProps> = ({
               disabled={currentNegoPrice <= 0}
             >
               <Check size={18} />
-              <span>Terapkan Harga Nego</span>
+              <span>Terapkan</span>
             </button>
 
             {(item.isNego || currentNegoPrice !== originalPrice) && (
@@ -233,10 +233,10 @@ export const NegoModal: React.FC<NegoModalProps> = ({
                 type="button"
                 className="btn-reset-nego"
                 onClick={handleReset}
-                title="Kembalikan harga ke harga normal toko"
+                title="Kembalikan ke harga normal"
               >
                 <RotateCcw size={15} />
-                <span>Reset ke Normal ({formatRupiah(originalPrice)})</span>
+                <span>Reset Normal ({formatRupiah(originalPrice)})</span>
               </button>
             )}
 

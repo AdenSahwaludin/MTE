@@ -583,17 +583,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
           <div className="input-card">
             <div className="card-header-title">
               <h2>
-                <ShoppingCart size={20} color="#2563eb" /> Kasir & Generate Struk
+                <ShoppingCart size={20} color="#2563eb" /> Kasir
               </h2>
               <div className="shortcut-tip hide-on-mobile">
-                <Keyboard size={14} /> <kbd>Enter</kbd> Pilih & Tambah | <kbd>F2</kbd> Proses Bayar | <kbd>F4</kbd> Reset
+                <Keyboard size={14} /> <kbd>Enter</kbd> Tambah &bull; <kbd>F2</kbd> Bayar &bull; <kbd>F4</kbd> Reset
               </div>
             </div>
 
             <form onSubmit={handleAddItem} className="quick-add-form">
               {/* Nama Barang / Autocomplete */}
               <div className="form-group">
-                <label>Nama Barang / Alias</label>
+                <label>Nama Barang</label>
                 <AutocompleteInput
                   inputRef={nameInputRef}
                   value={itemName}
@@ -606,14 +606,14 @@ export const KasirView: React.FC<KasirViewProps> = ({
                   }}
                   onSelectProduct={handleSelectProduct}
                   onEnterWithoutMatch={handleEnterWithoutMatch}
-                  placeholder="Ketik nama barang atau alias..."
+                  placeholder="Nama barang / barcode..."
                 />
               </div>
 
               <div className="price-qty-grid">
                 {/* Harga Barang */}
                 <div className="form-group">
-                  <label>Harga Satuan</label>
+                  <label>Harga</label>
                   <div className="price-input-wrapper">
                     <span className="currency-prefix">Rp</span>
                     <FormattedNumberInput
@@ -669,7 +669,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
               {/* Tambah Button */}
               <button type="submit" className="btn-add-item">
-                <Plus size={18} /> Tambah Item
+                <Plus size={18} /> Tambah
               </button>
             </form>
           </div>
@@ -678,7 +678,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
           <div className="cart-card">
             <div className="card-header-title" style={{ marginBottom: '0.5rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>
-                Daftar Barang Belanjaan ({cartItems.length} item • {totalQty} pcs)
+                Keranjang ({cartItems.length} item • {totalQty} pcs)
               </h3>
               {cartItems.length > 0 && (
                 <button
@@ -695,7 +695,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                     gap: '4px',
                   }}
                 >
-                  <Trash2 size={13} /> Kosongkan Keranjang
+                  <Trash2 size={13} /> Kosongkan
                 </button>
               )}
             </div>
@@ -703,9 +703,9 @@ export const KasirView: React.FC<KasirViewProps> = ({
             {cartItems.length === 0 ? (
               <div className="empty-cart-state">
                 <ShoppingCart className="empty-cart-icon" />
-                <p style={{ fontWeight: 600 }}>Belum ada barang di struk</p>
+                <p style={{ fontWeight: 600 }}>Keranjang Kosong</p>
                 <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>
-                  Ketik nama barang dan harga di atas, lalu klik <strong>Tambah Item</strong> atau tekan <kbd>Enter</kbd>.
+                  Ketik nama barang atau pilih dari saran, lalu tekan <kbd>Enter</kbd>.
                 </p>
               </div>
             ) : (
@@ -714,8 +714,8 @@ export const KasirView: React.FC<KasirViewProps> = ({
                   <thead>
                     <tr>
                       <th>Barang</th>
-                      <th style={{ textAlign: 'right' }}>Harga Satuan</th>
-                      <th style={{ textAlign: 'center', width: '120px' }}>Jumlah (Qty)</th>
+                      <th style={{ textAlign: 'right' }}>Harga</th>
+                      <th style={{ textAlign: 'center', width: '120px' }}>Qty</th>
                       <th style={{ textAlign: 'right' }}>Subtotal</th>
                       <th style={{ width: '40px' }}></th>
                     </tr>
@@ -809,9 +809,9 @@ export const KasirView: React.FC<KasirViewProps> = ({
             {/* Total Ringkasan */}
             <div className="totals-summary">
               <div className="totals-info-left">
-                <span className="totals-label">TOTAL TAGIHAN</span>
+                <span className="totals-label">TOTAL</span>
                 <span className="totals-item-count">
-                  {cartItems.length} Jenis Barang ({totalQty} Pcs)
+                  {cartItems.length} item • {totalQty} pcs
                 </span>
               </div>
               <span className="totals-amount">{formatRupiah(totalAmount)}</span>
@@ -824,10 +824,10 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 className="btn-primary-checkout"
                 onClick={handleOpenPaymentModal}
                 disabled={cartItems.length === 0}
-                title="Buka menu pembayaran, input nama/catatan, dan cetak struk (F2)"
+                title="Buka menu pembayaran (F2)"
               >
                 <CreditCard size={20} />
-                <span>Proses Pembayaran<span className="btn-shortcut-tag"> (F2)</span></span>
+                <span>Bayar<span className="btn-shortcut-tag"> (F2)</span></span>
                 <ArrowRight size={18} />
               </button>
 
@@ -850,7 +850,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
               onClick={() => setShowMobilePreview(!showMobilePreview)}
             >
               <Printer size={16} />
-              {showMobilePreview ? 'Sembunyikan Tampilan Struk' : 'Lihat Tampilan Struk (58mm)'}
+              {showMobilePreview ? 'Tutup Struk' : 'Lihat Struk 58mm'}
             </button>
           </div>
         </div>

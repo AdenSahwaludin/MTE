@@ -34,10 +34,10 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
     <div className="receipt-preview-panel">
       <div className="preview-header">
         <span>
-          <Eye size={16} /> Live Preview Struk 58mm
+          <Eye size={15} /> Preview Struk
         </span>
         <span style={{ fontSize: '0.72rem', background: '#e2e8f0', color: '#475569', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
-          58 mm (Standar Mini)
+          58mm
         </span>
       </div>
 

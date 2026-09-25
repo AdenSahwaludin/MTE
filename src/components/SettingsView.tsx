@@ -383,10 +383,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="page-header-row">
         <div className="page-title">
           <h2>
-            <Settings size={24} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '8px' }} color="#2563eb" />
-            Pengaturan Toko & Printer Thermal
+            <Settings size={22} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '8px' }} color="#2563eb" />
+            Pengaturan
           </h2>
-          <p>Sesuaikan nama toko, alamat, WhatsApp, kelola pengguna admin & kasir, dan printer.</p>
         </div>
       </div>
 
@@ -409,7 +408,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             <div className="form-group">
-              <label>Slogan / Tagline Toko</label>
+              <label>Slogan / Tagline</label>
               <input
                 type="text"
                 className="form-input"
@@ -420,18 +419,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             <div className="form-group">
-              <label>Alamat Toko</label>
+              <label>Alamat</label>
               <input
                 type="text"
                 className="form-input"
                 value={profile.address}
                 onChange={(e) => updateProfile({ address: e.target.value })}
-                placeholder="Contoh: Blok Gebangmampang, Desa Margamulya, Kec. Bongas"
+                placeholder="Contoh: Blok Gebangmampang, Margamulya"
               />
             </div>
 
             <div className="form-group">
-              <label>No. Telepon / WhatsApp</label>
+              <label>WhatsApp / No. Telp</label>
               <input
                 type="text"
                 className="form-input"
@@ -442,7 +441,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             <div className="form-group">
-              <label>Nama Kasir Default di Struk</label>
+              <label>Kasir Default</label>
               <input
                 type="text"
                 className="form-input"
@@ -455,23 +454,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
           <div className="settings-card">
             <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Printer size={18} color="#2563eb" /> Format Struk & Printer Thermal
+              <Printer size={18} color="#2563eb" /> Format Struk & Printer
             </h3>
 
             <div className="form-group" style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', padding: '12px' }}>
-              <label style={{ fontWeight: 700 }}>Printer Bluetooth (APK Langsung, 58mm)</label>
+              <label style={{ fontWeight: 700 }}>Printer Bluetooth (58mm)</label>
               {!isNativePrinter ? (
                 <p style={{ fontSize: '0.82rem', color: '#475569', margin: '6px 0 0 0' }}>
-                  Mode browser: pakai tombol Bluetooth di menu Kasir. Install APK terbaru untuk print langsung tanpa aplikasi tambahan.
+                  Gunakan tombol Bluetooth di kasir untuk koneksi printer thermal.
                 </p>
               ) : (
                 <>
                   <p style={{ fontSize: '0.82rem', color: '#0369a1', margin: '6px 0 10px 0' }}>
-                    Pairing dulu printer VSC MP-58M di Bluetooth HP, lalu pilih di bawah. Sekali pilih, tombol Biru di Kasir langsung cetak.
+                    Pairing printer di Bluetooth perangkat, lalu pilih di bawah:
                   </p>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '10px' }}>
                     <button type="button" className="btn-outline" onClick={handleScanPrinters} disabled={isScanningPrinter} style={{ fontSize: '0.82rem' }}>
-                      {isScanningPrinter ? 'Mencari...' : 'Cari Printer Ter-pairing'}
+                      {isScanningPrinter ? 'Mencari...' : 'Cari Printer Bluetooth'}
                     </button>
                     {savedPrinter && (
                       <span style={{ fontSize: '0.78rem', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '999px', fontWeight: 700 }}>
@@ -500,23 +499,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {/* Tombol Uji Coba Cetak (Test Print 58mm) */}
               <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ fontSize: '0.8rem', color: '#0369a1' }}>
-                  <strong>Uji Coba Cetak:</strong> Tes apakah printer Bluetooth merespons & kertas keluar.
+                  Tes respon & cetak kertas printer 58mm.
                 </div>
                 <button
                   type="button"
                   className="btn-test-print"
                   onClick={handleTestPrint}
                   disabled={isTestingPrint}
-                  title="Cetak struk uji coba singkat ke printer 58mm"
+                  title="Cetak struk uji coba 58mm"
                 >
                   <Printer size={15} />
-                  <span>{isTestingPrint ? 'Sedang Mencetak...' : 'Tes Cetak Struk Sampel (58mm)'}</span>
+                  <span>{isTestingPrint ? 'Mencetak...' : 'Tes Cetak 58mm'}</span>
                 </button>
               </div>
             </div>
 
             <div className="form-group">
-              <label>Ukuran Kertas Printer Thermal</label>
+              <label>Ukuran Kertas</label>
               <div className="paper-size-selector">
                 <label className={`paper-option ${profile.paperSize === '58mm' ? 'selected' : ''}`}>
                   <input
@@ -529,8 +528,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className="paper-option-content">
                     <div className="paper-size-badge">58 MM</div>
                     <div>
-                      <strong>Standar Mini Thermal Printer (58mm)</strong>
-                      <p>Kompatibel dengan semua printer thermal mini 58mm (USB, Bluetooth, POS-58, Panda, Eppos, Xprinter, VSC, dll.)</p>
+                      <strong>Standar Thermal 58mm</strong>
                     </div>
                   </div>
                 </label>
@@ -538,10 +536,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             <div className="form-group">
-              <label>Pesan Penutup Struk (Footer)</label>
+              <label>Catatan Kaki Struk</label>
               <textarea
                 className="form-input"
-                style={{ height: '80px', resize: 'vertical' }}
+                style={{ height: '70px', resize: 'vertical' }}
                 value={profile.footerNote}
                 onChange={(e) => updateProfile({ footerNote: e.target.value })}
                 placeholder="Contoh: Terima Kasih Atas Kunjungan Anda"
@@ -555,7 +553,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   checked={profile.autoSaveProducts}
                   onChange={(e) => updateProfile({ autoSaveProducts: e.target.checked })}
                 />
-                <strong>Auto-Save Produk Baru</strong> (Otomatis simpan barang & harga saat diketik di kasir)
+                <strong>Auto-Simpan Produk Baru</strong> (Otomatis simpan barang dari kasir)
               </label>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
@@ -564,7 +562,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   checked={profile.showDateTime}
                   onChange={(e) => updateProfile({ showDateTime: e.target.checked })}
                 />
-                Tampilkan Tanggal & Waktu di Struk
+                Tampilkan Tanggal & Waktu
               </label>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem' }}>
@@ -573,13 +571,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   checked={profile.showCashierName}
                   onChange={(e) => updateProfile({ showCashierName: e.target.checked })}
                 />
-                Tampilkan Nama Kasir di Struk
+                Tampilkan Nama Kasir
               </label>
             </div>
 
             <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
               <button type="submit" className="btn-primary" style={{ padding: '0.75rem 1.5rem' }}>
-                <Save size={18} /> Simpan Pengaturan
+                <Save size={18} /> Simpan
               </button>
             </div>
           </div>
@@ -605,11 +603,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
             <div>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-                Kelola Pengguna (Admin & Kasir)
+                Kelola Pengguna
               </h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
-                Atur akun login kasir dan administrator sistem POS Mega Tehnik Elektronik.
-              </p>
             </div>
           </div>
 
@@ -619,7 +614,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             onClick={handleOpenAddUser}
             style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <UserPlus size={16} /> Tambah Pengguna Baru
+            <UserPlus size={16} /> Tambah Pengguna
           </button>
         </div>
 
@@ -629,7 +624,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <tr>
                 <th>Pengguna</th>
                 <th>Username</th>
-                <th style={{ width: '130px' }}>Role / Hak Akses</th>
+                <th style={{ width: '130px' }}>Role</th>
                 <th style={{ width: '140px', textAlign: 'center' }}>Aksi</th>
               </tr>
             </thead>
@@ -807,8 +802,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     value={userFormData.role}
                     onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value as 'admin' | 'kasir' })}
                   >
-                    <option value="kasir">Kasir (Akses Kasir & Struk, Produk, Riwayat)</option>
-                    <option value="admin">Administrator (Akses Penuh termasuk Pengaturan & Kelola User)</option>
+                    <option value="kasir">Kasir</option>
+                    <option value="admin">Administrator</option>
                   </select>
                 </div>
 
@@ -821,7 +816,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     Batal
                   </button>
                   <button type="submit" className="btn-primary">
-                    <Save size={16} /> Simpan Pengguna
+                    <Save size={16} /> Simpan
                   </button>
                 </div>
               </form>
@@ -849,11 +844,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
             <div>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-                Database Cloud Turso (libSQL)
+                Database Cloud (Turso)
               </h3>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
-                Arsitektur <strong>Local-First (0 ms latency)</strong> dengan sinkronisasi multi-device di latar belakang.
-              </p>
             </div>
           </div>
 
@@ -871,13 +863,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             }}
           >
             <RefreshCw size={15} className={isSyncing ? 'spin-animation' : ''} />
-            {isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang'}
+            {isSyncing ? 'Sinkron...' : 'Sinkronkan'}
           </button>
         </div>
 
         <div className="turso-stat-grid">
           <div className="turso-stat-box">
-            <div className="turso-stat-label">Host Database Cloud</div>
+            <div className="turso-stat-label">Host Cloud</div>
             <div className="turso-stat-value" style={{ fontSize: '0.82rem', wordBreak: 'break-all' }}>
               <Server size={14} color="#0284c7" />
               {tursoConfig.databaseHost || 'Turso Cloud'}
@@ -885,7 +877,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
 
           <div className="turso-stat-box">
-            <div className="turso-stat-label">Status Sinkronisasi</div>
+            <div className="turso-stat-label">Status</div>
             <div className="turso-stat-value">
               {syncInfo.status === 'synced' && (
                 <>
@@ -921,7 +913,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
 
           <div className="turso-stat-box">
-            <div className="turso-stat-label">Terakhir Sinkron</div>
+            <div className="turso-stat-label">Terakhir</div>
             <div className="turso-stat-value" style={{ fontSize: '0.85rem' }}>
               {syncInfo.lastSyncedAt
                 ? new Date(syncInfo.lastSyncedAt).toLocaleString('id-ID', {
@@ -936,34 +928,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
 
           <div className="turso-stat-box">
-            <div className="turso-stat-label">Antrean Perubahan Offline</div>
+            <div className="turso-stat-label">Antrean Offline</div>
             <div className="turso-stat-value">
               {syncInfo.pendingCount > 0 ? (
-                <span style={{ color: '#f59e0b', fontWeight: 700 }}>{syncInfo.pendingCount} mutasi tertunda</span>
+                <span style={{ color: '#f59e0b', fontWeight: 700 }}>{syncInfo.pendingCount} tertunda</span>
               ) : (
-                <span style={{ color: '#10b981' }}>0 (Semua tersimpan di cloud)</span>
+                <span style={{ color: '#10b981' }}>0 (Tersimpan)</span>
               )}
             </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)',
-            border: '1px solid #bae6fd',
-            borderRadius: '10px',
-            padding: '10px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            fontSize: '0.83rem',
-            color: '#0369a1',
-            margin: '0.75rem 0',
-          }}
-        >
-          <Zap size={18} color="#0284c7" style={{ flexShrink: 0 }} />
-          <div>
-            <strong>Performa Kasir 0 ms Terjamin:</strong> Autocomplete pencarian barang dan cetak struk bekerja seketika di memori lokal tanpa menunggu latensi server. Data dikirim ke Turso secara otomatis di background.
           </div>
         </div>
 
@@ -976,7 +948,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             style={{ fontSize: '0.85rem' }}
           >
             <Activity size={15} />
-            {pingState.testing ? 'Menguji Koneksi...' : 'Uji Koneksi Turso'}
+            {pingState.testing ? 'Menguji...' : 'Uji Koneksi'}
             {pingState.latencyMs !== undefined && !pingState.testing && (
               <span
                 style={{
@@ -1002,7 +974,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             style={{ fontSize: '0.85rem' }}
           >
             <Upload size={15} />
-            {isUploadingAll ? 'Mengunggah...' : 'Upload Ulang Seluruh Data Lokal ke Turso'}
+            {isUploadingAll ? 'Mengunggah...' : 'Upload Data Lokal ke Cloud'}
           </button>
 
           <button
@@ -1018,25 +990,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             }}
           >
             <Trash2 size={15} color="#ef4444" />
-            {isClearingTurso ? 'Mengosongkan...' : 'Kosongkan Database Turso'}
+            {isClearingTurso ? 'Mengosongkan...' : 'Kosongkan Cloud'}
           </button>
         </div>
       </div>
 
       <div className="settings-card" style={{ marginTop: '1.5rem' }}>
         <h3 style={{ fontSize: '1.05rem', fontWeight: 700 }}>
-          Cadangkan & Pulihkan Data (Backup / Restore)
+          Cadangkan & Pulihkan (Backup)
         </h3>
-        <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
-          Simpan seluruh basis data (semua produk, nama lain/alias, transaksi, pengguna, dan pengaturan) ke dalam satu file backup JSON agar aman atau dapat dipindahkan ke komputer/laptop lain.
-        </p>
 
         <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
           <button type="button" className="btn-outline" onClick={handleExport}>
-            <Download size={16} /> Unduh File Backup (Export JSON)
+            <Download size={16} /> Export Backup (JSON)
           </button>
           <label className="btn-outline" style={{ cursor: 'pointer', margin: 0 }}>
-            <Upload size={16} /> Pulihkan dari File (Import JSON)
+            <Upload size={16} /> Import Backup (JSON)
             <input
               type="file"
               accept=".json"
@@ -1071,7 +1040,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onClick={onPreviewSplash}
               style={{ padding: '0.6rem 1.25rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #1565C0, #2196F3)' }}
             >
-              Lihat Animasi Splash Screen
+              Preview Splash Screen
             </button>
           )}
         </div>

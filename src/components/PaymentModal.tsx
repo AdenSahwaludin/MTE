@@ -113,23 +113,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <div className="payment-modal-title-wrap">
             <div className="payment-modal-title">
               <Coins size={18} color="#2563eb" />
-              <span>Pembayaran & Cetak Struk</span>
+              <span>Pembayaran</span>
             </div>
             <span className="payment-modal-invoice-tag">
-              {invoiceNo} • {cartItems.length} Barang ({totalQty} Pcs)
+              {invoiceNo} • {totalQty} pcs
             </span>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose} title="Tutup Modal (Esc)">
+          <button type="button" className="modal-close-btn" onClick={onClose} title="Tutup (Esc)">
             <X size={20} />
           </button>
         </div>
 
         <div className="modal-body payment-modal-body">
-          {/* Total Tagihan Box (Clean Bright Light Theme) */}
+          {/* Total Box */}
           <div className="payment-total-box">
             <div className="payment-total-info">
-              <span className="payment-total-label">TOTAL TAGIHAN</span>
-              <span className="payment-total-items-badge">{totalQty} Pcs Barang</span>
+              <span className="payment-total-label">TOTAL</span>
+              <span className="payment-total-items-badge">{totalQty} pcs</span>
             </div>
             <div className="payment-total-amount">{formatRupiah(totalAmount)}</div>
           </div>
@@ -173,7 +173,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="payment-field-group">
               <div className="payment-label-row">
                 <label className="payment-section-label">
-                  <Coins size={14} color="#2563eb" /> Uang Diterima / Nominal Bayar
+                  <Coins size={14} color="#2563eb" /> Uang Diterima
                 </label>
                 {numericCash > 0 && changeAmount === 0 && (
                   <span className="badge-exact-cash">
@@ -195,7 +195,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     >
                       {idx === 0 ? (
                         <>
-                          <span className="chip-label">Uang Pas:</span>
+                          <span className="chip-label">Pas:</span>
                           <span className="chip-val">{formatRupiah(amount)}</span>
                         </>
                       ) : (
@@ -223,7 +223,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="insufficient-alert">
                   <AlertCircle size={15} style={{ flexShrink: 0 }} />
                   <span>
-                    Uang kurang <strong>{formatRupiah(totalAmount - numericCash)}</strong>
+                    Kurang <strong>{formatRupiah(totalAmount - numericCash)}</strong>
                   </span>
                 </div>
               )}
@@ -233,7 +233,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="change-display-compact ok">
                   <div className="change-label">
                     <CheckCircle2 size={16} color="#059669" />
-                    <span>KEMBALIAN:</span>
+                    <span>Kembalian:</span>
                   </div>
                   <span className="change-value">{formatRupiah(Math.max(0, changeAmount))}</span>
                 </div>
@@ -247,26 +247,26 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
               <div className="non-cash-text-wrap">
                 <div className="non-cash-title">
-                  {paymentMethod === 'qris' ? 'Pembayaran QRIS' : 'Pembayaran Transfer Bank'}
+                  {paymentMethod === 'qris' ? 'QRIS' : 'Transfer Bank'}
                 </div>
                 <div className="non-cash-desc">
-                  Nilai transaksi otomatis pas: <strong>{formatRupiah(totalAmount)}</strong> (Tanpa uang kembalian).
+                  Uang pas: <strong>{formatRupiah(totalAmount)}</strong> (tanpa kembalian)
                 </div>
               </div>
             </div>
           )}
 
-          {/* Info Pelanggan & Catatan (opsional, ikut tercetak di struk) */}
+          {/* Info Pelanggan & Catatan */}
           <div className="payment-field-group">
             <div className="form-group" style={{ marginBottom: '0.6rem' }}>
               <label className="payment-section-label" htmlFor="payment-customer">
-                Nama Pelanggan (opsional)
+                Pelanggan (opsional)
               </label>
               <input
                 id="payment-customer"
                 type="text"
                 className="form-input"
-                placeholder="Contoh: Budi"
+                placeholder="Nama pelanggan..."
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 maxLength={60}
@@ -275,7 +275,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="payment-section-label" htmlFor="payment-notes">
-                Catatan Struk (opsional)
+                Catatan (opsional)
               </label>
               <input
                 id="payment-notes"
@@ -283,10 +283,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 className="form-input"
                 placeholder={
                   paymentMethod === 'qris'
-                    ? 'Contoh: QRIS BCA / ShopeePay / GoPay'
+                    ? 'Catatan QRIS / keterangan...'
                     : paymentMethod === 'transfer'
-                    ? 'Contoh: Transfer Mandiri / BCA / No. Ref'
-                    : 'Contoh: tempo / garansi 1 minggu'
+                    ? 'No. Ref / bank...'
+                    : 'Catatan struk / garansi...'
                 }
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -304,14 +304,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               className="btn-primary-bluetooth"
               onClick={onPrintBluetooth}
               disabled={isPrintingBt || isInsufficientCash}
-              title="Cetak langsung ke printer Bluetooth (VSC MP-58M) via Web Bluetooth"
+              title="Cetak langsung ke printer Bluetooth"
             >
               <Bluetooth size={19} className={isPrintingBt ? 'animate-spin' : ''} />
               <div className="btn-bt-content">
                 <span className="btn-bt-title">
-                  {isPrintingBt ? 'Menghubungkan Bluetooth...' : 'Cetak Bluetooth (MP-58M)'}
+                  {isPrintingBt ? 'Menghubungkan...' : 'Cetak Bluetooth'}
                 </span>
-                <span className="btn-bt-subtitle">Direct ESC/POS Android & PC</span>
+                <span className="btn-bt-subtitle">Thermal 58mm</span>
               </div>
             </button>
 
@@ -322,10 +322,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 className="btn-primary-save-only"
                 onClick={onSaveOnly}
                 disabled={isInsufficientCash}
-                title="Simpan transaksi langsung ke database tanpa dialog cetak (F3)"
+                title="Simpan transaksi tanpa cetak (F3)"
               >
                 <Save size={17} />
-                <span>Simpan Saja<span className="btn-shortcut-tag"> (F3)</span></span>
+                <span>Simpan <span className="btn-shortcut-tag">(F3)</span></span>
               </button>
 
               <button
@@ -336,7 +336,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 title="Cetak via Thermer iOS"
               >
                 <Share2 size={14} />
-                <span>Thermer (iOS)</span>
+                <span>Thermer iOS</span>
               </button>
             </div>
           </div>
@@ -345,10 +345,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {/* Modal Footer: Back to Cart Button */}
         <div className="modal-footer payment-modal-footer">
           <button type="button" className="btn-outline-compact" onClick={onClose}>
-            <ArrowLeft size={15} /> Kembali ke Keranjang
+            <ArrowLeft size={15} /> Kembali
           </button>
           <span className="esc-hint">
-            Tekan <kbd>Esc</kbd> untuk batal
+            <kbd>Esc</kbd> Batal
           </span>
         </div>
       </div>

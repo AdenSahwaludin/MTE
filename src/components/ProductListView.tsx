@@ -133,17 +133,14 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
       <div className="page-header-row">
         <div className="page-title">
           <h2>
-            <Package size={24} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '8px' }} color="#2563eb" />
-            Daftar Produk ({products.length} Barang)
+            <Package size={22} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '8px' }} color="#2563eb" />
+            Produk ({products.length})
           </h2>
-          <p>
-            Kelola master data produk, harga satuan, kategori, dan detail alias untuk kasir.
-          </p>
         </div>
 
         <div className="page-actions">
           <label className="btn-outline" style={{ cursor: 'pointer', margin: 0 }}>
-            <Upload size={16} /> Import JSON
+            <Upload size={15} /> Import
             <input
               type="file"
               accept=".json"
@@ -152,10 +149,10 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
             />
           </label>
           <button type="button" className="btn-outline" onClick={handleExport}>
-            <Download size={16} /> Export JSON
+            <Download size={15} /> Export
           </button>
           <button type="button" className="btn-primary" onClick={handleOpenAddModal}>
-            <Plus size={18} /> Tambah Produk
+            <Plus size={16} /> Tambah
           </button>
         </div>
       </div>
@@ -167,7 +164,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
           <input
             type="text"
             className="form-input"
-            placeholder="Cari nama produk, nama lain/alias, kategori, atau ID..."
+            placeholder="Cari produk / barcode / kategori..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -176,11 +173,11 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
         {categories.length > 0 && (
           <select
             className="form-input"
-            style={{ width: 'auto', minWidth: '170px' }}
+            style={{ width: 'auto', minWidth: '150px' }}
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
           >
-            <option value="all">Semua Kategori ({products.length})</option>
+            <option value="all">Semua ({products.length})</option>
             {categories.map((cat) => {
               const count = products.filter((p) => (p.category || '') === cat).length;
               return (
@@ -198,22 +195,17 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
         {filteredProducts.length === 0 ? (
           <div className="empty-cart-state">
             <Package className="empty-cart-icon" />
-            <p style={{ fontWeight: 600 }}>Tidak ada produk yang cocok</p>
-            <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>
-              {searchQuery
-                ? `Tidak ditemukan produk dengan kata kunci "${searchQuery}"`
-                : 'Belum ada produk terdaftar. Klik Tambah Produk untuk menambahkan.'}
-            </p>
+            <p style={{ fontWeight: 600 }}>Produk tidak ditemukan</p>
           </div>
         ) : (
           <div className="cart-table-wrapper" style={{ margin: 0 }}>
             <table className="cart-table">
               <thead>
                 <tr>
-                  <th style={{ width: '42%' }}>Nama Produk</th>
+                  <th style={{ width: '42%' }}>Produk</th>
                   <th style={{ width: '20%' }}>Kategori</th>
                   <th style={{ width: '12%' }}>Satuan</th>
-                  <th style={{ width: '14%', textAlign: 'right' }}>Harga Satuan</th>
+                  <th style={{ width: '14%', textAlign: 'right' }}>Harga</th>
                   <th style={{ width: '12%', textAlign: 'center' }}>Aksi</th>
                 </tr>
               </thead>

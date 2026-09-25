@@ -101,10 +101,9 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
       <div className="page-header-row">
         <div className="page-title">
           <h2>
-            <History size={24} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '8px' }} color="#2563eb" />
-            Riwayat Transaksi Struk
+            <History size={22} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '8px' }} color="#2563eb" />
+            Riwayat Transaksi
           </h2>
-          <p>Daftar seluruh struk yang pernah dibuat dan dicetak.</p>
         </div>
       </div>
 
@@ -115,7 +114,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             <Receipt size={22} />
           </div>
           <div className="stat-info">
-            <h4>Transaksi Hari Ini</h4>
+            <h4>Hari Ini</h4>
             <span>{todayTransactions.length} Struk</span>
           </div>
         </div>
@@ -135,8 +134,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             <Calendar size={22} />
           </div>
           <div className="stat-info">
-            <h4>Total Semua Transaksi</h4>
-            <span>{transactions.length} Struk ({formatRupiah(totalOmset)})</span>
+            <h4>Total Semua</h4>
+            <span>{transactions.length} Struk • {formatRupiah(totalOmset)}</span>
           </div>
         </div>
       </div>
@@ -148,7 +147,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           <input
             type="text"
             className="form-input"
-            placeholder="Cari berdasarkan No. Struk, Nama Barang, atau Pelanggan..."
+            placeholder="Cari struk / barang / pelanggan..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -160,20 +159,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         {filtered.length === 0 ? (
           <div className="empty-cart-state">
             <Receipt className="empty-cart-icon" />
-            <p style={{ fontWeight: 600 }}>Belum ada riwayat transaksi</p>
-            <p style={{ fontSize: '0.8rem', marginTop: '4px' }}>
-              Struk yang dicetak di menu Kasir akan otomatis tercatat di sini.
-            </p>
+            <p style={{ fontWeight: 600 }}>Belum ada riwayat</p>
           </div>
         ) : (
           <div className="cart-table-wrapper" style={{ margin: 0 }}>
             <table className="cart-table">
               <thead>
                 <tr>
-                  <th style={{ width: '22%' }}>No. Struk</th>
-                  <th style={{ width: '20%' }}>Waktu Transaksi</th>
-                  <th style={{ width: '25%' }}>Jumlah Barang</th>
-                  <th style={{ width: '18%', textAlign: 'right' }}>Total Tagihan</th>
+                  <th style={{ width: '22%' }}>Struk</th>
+                  <th style={{ width: '20%' }}>Waktu</th>
+                  <th style={{ width: '25%' }}>Barang</th>
+                  <th style={{ width: '18%', textAlign: 'right' }}>Total</th>
                   <th style={{ width: '15%', textAlign: 'center' }}>Aksi</th>
                 </tr>
               </thead>
@@ -225,7 +221,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                               fontWeight: 600,
                             }}
                           >
-                            {t.items.length} Barang {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            {t.items.length} item {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                           </button>
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
@@ -239,7 +235,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                               style={{ color: '#0284c7', borderColor: '#bae6fd' }}
                               onClick={() => handleReprintBluetooth(t)}
                               disabled={isPrintingBtId === t.id}
-                              title="Cetak Langsung via Bluetooth (Android / PC)"
+                              title="Cetak Bluetooth"
                             >
                               <Bluetooth size={15} className={isPrintingBtId === t.id ? 'animate-spin' : ''} />
                             </button>
@@ -261,7 +257,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                           <td colSpan={5} style={{ background: '#f8fafc', padding: '1rem 1.5rem' }}>
                             <div style={{ fontSize: '0.85rem' }}>
                               <div style={{ fontWeight: 700, marginBottom: '0.5rem' }}>
-                                Rincian Barang Pembelian:
+                                Rincian Barang:
                               </div>
                               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 {t.items.map((item, idx) => (
@@ -282,17 +278,17 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                                     onClick={() => handleReprintBluetooth(t)}
                                     className="btn-history-bluetooth"
                                     disabled={isPrintingBtId === t.id}
-                                    title="Cetak langsung via Bluetooth (Android Chrome / PC)"
+                                    title="Cetak Bluetooth"
                                   >
-                                    <Bluetooth size={13} className={isPrintingBtId === t.id ? 'animate-spin' : ''} /> {isPrintingBtId === t.id ? 'Menghubungkan...' : 'Bluetooth (Android)'}
+                                    <Bluetooth size={13} className={isPrintingBtId === t.id ? 'animate-spin' : ''} /> {isPrintingBtId === t.id ? 'Menghubungkan...' : 'Bluetooth'}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleReprintThermer(t)}
                                     className="btn-history-thermer"
-                                    title="Cetak ulang langsung via Thermer (iOS)"
+                                    title="Cetak Thermer iOS"
                                   >
-                                    <Share2 size={13} /> Thermer (iOS)
+                                    <Share2 size={13} /> Thermer iOS
                                   </button>
                                 </div>
                                 <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', color: '#475569' }}>

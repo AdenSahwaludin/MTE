@@ -50,7 +50,10 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ transaction, sto
         <div className="thermal-items-list">
           {transaction.items && transaction.items.map((item, index) => (
             <div key={index} className="thermal-item-entry">
-              <div className="thermal-item-name">{item.name}</div>
+              <div className="thermal-item-name">
+                {item.name}
+                {item.isNego && <span style={{ fontSize: '8px', marginLeft: '3px' }}> (Nego)</span>}
+              </div>
               <div className="thermal-item-detail">
                 <span>
                   {item.qty} {item.unit || 'pcs'} x {formatRupiah(item.price)}
@@ -70,7 +73,13 @@ export const ThermalReceipt: React.FC<ThermalReceiptProps> = ({ transaction, sto
             <span>{formatRupiah(transaction.totalAmount)}</span>
           </div>
           <div className="thermal-total-row">
-            <span>TUNAI / BAYAR</span>
+            <span>
+              {transaction.paymentMethod === 'qris'
+                ? 'BAYAR (QRIS)'
+                : transaction.paymentMethod === 'transfer'
+                ? 'BAYAR (TRANSFER)'
+                : 'TUNAI / BAYAR'}
+            </span>
             <span>{formatRupiah(transaction.cashAmount)}</span>
           </div>
           <div className="thermal-total-row">

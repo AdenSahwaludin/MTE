@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StoreProfile, UserAccount } from '../types';
+import { StoreProfile, UserAccount, Transaction } from '../types';
 import {
   saveStoreProfile,
   exportDataJSON,
@@ -11,11 +11,13 @@ import {
 } from '../services/storageService';
 import { syncService, SyncInfo } from '../services/syncService';
 import { testTursoConnection, getTursoConfig } from '../services/tursoClient';
+import { printDirectBluetooth } from '../services/bluetoothPrintService';
 import {
   isNativePrinterAvailable,
   listPairedPrinters,
   getSavedPrinterAddress,
   savePrinterAddress,
+  printNativeDirect,
   PairedPrinter,
 } from '../services/nativePrintService';
 import {
@@ -127,6 +129,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       showToast(err?.message || 'Gagal scan printer.', 'info');
     } finally {
       setIsScanningPrinter(false);
+    }
+  };
+
+  const [isTestingPrint, setIsTestingPrint] = useState(false);
+
+  const handleTestPrint = async () => {
+    setIsTestingPrint(true);
+    const testTrx: Transaction = {
+      id: 'test-print-' + Date.now(),
+      invoiceNo: 'TEST-001',
+      date: new Date().toISOString(),
+      items: [
+        {
+          id: 'test-item-1',
+          name: 'TES KONEKSI PRINTER 58MM',
+          price: 15000,
+          qty: 1,
+          subtotal: 15000,
+        },
+        {
+          id: 'test-item-2',
+          name: 'STATUS: SIAP TRANSAKSI',
+          price: 0,
+          qty: 1,
+          subtotal: 0,
+        },
+      ],
+      totalAmount: 15000,
+      cashAmount: 15000,
+      changeAmount: 0,
+      paymentMethod: 'cash',
+      cashierName: profile.cashierName || 'Tes Kasir',
+      notes: 'Uji Coba Printer Bluetooth OK',
+    };
+
+    try {
+      if (isNativePrinter) {
+        showToast('Mengirim cetak sampel ke printer APK...', 'info');
+        await printNativeDirect(testTrx, profile);
+        showToast('Berhasil mencetak struk uji coba via APK!', 'success');
+      } else {
+        showToast('Menghubungkan printer Bluetooth untuk cetak sampel...', 'info');
+        await printDirectBluetooth(testTrx, profile);
+        showToast('Berhasil mencetak struk uji coba Bluetooth!', 'success');
+      }
+    } catch (err: any) {
+      console.error('Test print error:', err);
+      showToast(
+        (err?.message || 'Gagal tes cetak.') + ' Pastikan printer Bluetooth menyala & siap.',
+        'info'
+      );
+    } finally {
+      setIsTestingPrint(false);
     }
   };
 
@@ -441,6 +496,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   )}
                 </>
               )}
+
+              {/* Tombol Uji Coba Cetak (Test Print 58mm) */}
+              <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed #bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ fontSize: '0.8rem', color: '#0369a1' }}>
+                  <strong>Uji Coba Cetak:</strong> Tes apakah printer Bluetooth merespons & kertas keluar.
+                </div>
+                <button
+                  type="button"
+                  className="btn-test-print"
+                  onClick={handleTestPrint}
+                  disabled={isTestingPrint}
+                  title="Cetak struk uji coba singkat ke printer 58mm"
+                >
+                  <Printer size={15} />
+                  <span>{isTestingPrint ? 'Sedang Mencetak...' : 'Tes Cetak Struk Sampel (58mm)'}</span>
+                </button>
+              </div>
             </div>
 
             <div className="form-group">

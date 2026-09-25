@@ -101,14 +101,21 @@ export function generateThermerReceiptEntries(
     const leftPart = ` ${item.qty} ${item.unit || 'pcs'} x ${formatRupiah(item.price)}`;
     const rightPart = formatRupiah(item.subtotal);
     const itemLine = formatTwoColumns(leftPart, rightPart, 30);
+    const itemName = item.isNego ? `${item.name} (Nego)` : item.name;
 
-    addText(`${item.name}\n${itemLine}`, 0, 0, 0);
+    addText(`${itemName}\n${itemLine}`, 0, 0, 0);
   });
 
   // 5. TOTAL & PEMBAYARAN (Digabung dalam 1 block)
   const payLines: string[] = ['------------------------------'];
   payLines.push(formatTwoColumns('TOTAL', formatRupiah(transaction.totalAmount), 30));
-  payLines.push(formatTwoColumns('TUNAI / BAYAR', formatRupiah(transaction.cashAmount), 30));
+  const payMethodLabel =
+    transaction.paymentMethod === 'qris'
+      ? 'BAYAR (QRIS)'
+      : transaction.paymentMethod === 'transfer'
+      ? 'BAYAR (TRANSFER)'
+      : 'TUNAI / BAYAR';
+  payLines.push(formatTwoColumns(payMethodLabel, formatRupiah(transaction.cashAmount), 30));
   payLines.push(formatTwoColumns('KEMBALIAN', formatRupiah(Math.max(0, transaction.changeAmount)), 30));
   if (transaction.notes) {
     payLines.push('------------------------------');

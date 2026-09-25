@@ -14,6 +14,7 @@ interface ReceiptPreviewProps {
   customerName?: string;
   cashierName?: string;
   notes?: string;
+  paymentMethod?: 'cash' | 'transfer' | 'qris';
 }
 
 export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
@@ -27,6 +28,7 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
   customerName,
   cashierName,
   notes,
+  paymentMethod = 'cash',
 }) => {
   return (
     <div className="receipt-preview-panel">
@@ -82,7 +84,14 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
           ) : (
             items.map((item) => (
               <div key={item.id} className="receipt-item-row">
-                <div className="receipt-item-name">{item.name}</div>
+                <div className="receipt-item-name">
+                  {item.name}
+                  {item.isNego && (
+                    <span style={{ fontSize: '9px', color: '#16a34a', fontWeight: 600, marginLeft: '4px' }}>
+                      (Nego)
+                    </span>
+                  )}
+                </div>
                 <div className="receipt-item-calc">
                   <span>
                     {item.qty} {item.unit || 'pcs'} x {formatRupiah(item.price)}
@@ -103,7 +112,13 @@ export const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({
             <span>{formatRupiah(total)}</span>
           </div>
           <div className="receipt-summary-row">
-            <span>TUNAI / BAYAR</span>
+            <span>
+              {paymentMethod === 'qris'
+                ? 'BAYAR (QRIS)'
+                : paymentMethod === 'transfer'
+                ? 'BAYAR (TRANSFER)'
+                : 'TUNAI / BAYAR'}
+            </span>
             <span>{formatRupiah(cash)}</span>
           </div>
           <div className="receipt-summary-row">

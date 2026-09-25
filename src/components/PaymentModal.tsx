@@ -12,6 +12,9 @@ import {
   Coins,
   ArrowLeft,
   Check,
+  Banknote,
+  QrCode,
+  CreditCard,
 } from 'lucide-react';
 
 export interface PaymentModalProps {
@@ -20,6 +23,8 @@ export interface PaymentModalProps {
   totalAmount: number;
   cartItems: CartItem[];
   invoiceNo: string;
+  paymentMethod: 'cash' | 'transfer' | 'qris';
+  setPaymentMethod: (method: 'cash' | 'transfer' | 'qris') => void;
   cashAmount: string;
   setCashAmount: (val: string) => void;
   smartCashSuggestions: number[];
@@ -43,6 +48,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   totalAmount,
   cartItems,
   invoiceNo,
+  paymentMethod,
+  setPaymentMethod,
   cashAmount,
   setCashAmount,
   smartCashSuggestions,
@@ -127,76 +134,127 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="payment-total-amount">{formatRupiah(totalAmount)}</div>
           </div>
 
-          {/* Quick Cash Chips & Input Tunai */}
-          <div className="payment-field-group">
-            <div className="payment-label-row">
-              <label className="payment-section-label">
-                <Coins size={14} color="#2563eb" /> Uang Diterima / Nominal Bayar
-              </label>
-              {numericCash > 0 && changeAmount === 0 && (
-                <span className="badge-exact-cash">
-                  <Check size={12} /> Uang Pas
-                </span>
+          {/* Metode Pembayaran (Segmented Control) */}
+          <div className="payment-method-selector">
+            <button
+              type="button"
+              className={`method-tab-btn ${paymentMethod === 'cash' ? 'active' : ''}`}
+              onClick={() => setPaymentMethod('cash')}
+            >
+              <Banknote size={16} />
+              <span>Tunai</span>
+            </button>
+            <button
+              type="button"
+              className={`method-tab-btn ${paymentMethod === 'qris' ? 'active' : ''}`}
+              onClick={() => {
+                setPaymentMethod('qris');
+                setCashAmount(totalAmount.toString());
+              }}
+            >
+              <QrCode size={16} />
+              <span>QRIS</span>
+            </button>
+            <button
+              type="button"
+              className={`method-tab-btn ${paymentMethod === 'transfer' ? 'active' : ''}`}
+              onClick={() => {
+                setPaymentMethod('transfer');
+                setCashAmount(totalAmount.toString());
+              }}
+            >
+              <CreditCard size={16} />
+              <span>Transfer</span>
+            </button>
+          </div>
+
+          {/* Skenario 1: Pembayaran Tunai (Cash) */}
+          {paymentMethod === 'cash' ? (
+            <div className="payment-field-group">
+              <div className="payment-label-row">
+                <label className="payment-section-label">
+                  <Coins size={14} color="#2563eb" /> Uang Diterima / Nominal Bayar
+                </label>
+                {numericCash > 0 && changeAmount === 0 && (
+                  <span className="badge-exact-cash">
+                    <Check size={12} /> Uang Pas
+                  </span>
+                )}
+              </div>
+
+              {/* Quick Cash Suggestions */}
+              <div className="quick-cash-chips-container">
+                {smartCashSuggestions.map((amount, idx) => {
+                  const isSelected = numericCash === amount;
+                  return (
+                    <button
+                      key={amount}
+                      type="button"
+                      className={`btn-quick-chip ${isSelected ? 'active' : ''} ${idx === 0 ? 'exact' : ''}`}
+                      onClick={() => setCashAmount(amount.toString())}
+                    >
+                      {idx === 0 ? (
+                        <>
+                          <span className="chip-label">Uang Pas:</span>
+                          <span className="chip-val">{formatRupiah(amount)}</span>
+                        </>
+                      ) : (
+                        <span className="chip-val">{formatRupiah(amount)}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom Cash Input */}
+              <div className="price-input-wrapper payment-input-custom">
+                <span className="currency-prefix">Rp</span>
+                <FormattedNumberInput
+                  inputRef={cashInputRef}
+                  className={`form-input ${isInsufficientCash ? 'warning' : ''}`}
+                  placeholder="0"
+                  value={cashAmount}
+                  onChange={(val) => setCashAmount(val)}
+                />
+              </div>
+
+              {/* Insufficient Cash Notice */}
+              {isInsufficientCash && (
+                <div className="insufficient-alert">
+                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                  <span>
+                    Uang kurang <strong>{formatRupiah(totalAmount - numericCash)}</strong>
+                  </span>
+                </div>
+              )}
+
+              {/* Kembalian / Status Display */}
+              {numericCash > 0 && !isInsufficientCash && (
+                <div className="change-display-compact ok">
+                  <div className="change-label">
+                    <CheckCircle2 size={16} color="#059669" />
+                    <span>KEMBALIAN:</span>
+                  </div>
+                  <span className="change-value">{formatRupiah(Math.max(0, changeAmount))}</span>
+                </div>
               )}
             </div>
-
-            {/* Quick Cash Suggestions */}
-            <div className="quick-cash-chips-container">
-              {smartCashSuggestions.map((amount, idx) => {
-                const isSelected = numericCash === amount;
-                return (
-                  <button
-                    key={amount}
-                    type="button"
-                    className={`btn-quick-chip ${isSelected ? 'active' : ''} ${idx === 0 ? 'exact' : ''}`}
-                    onClick={() => setCashAmount(amount.toString())}
-                  >
-                    {idx === 0 ? (
-                      <>
-                        <span className="chip-label">Uang Pas:</span>
-                        <span className="chip-val">{formatRupiah(amount)}</span>
-                      </>
-                    ) : (
-                      <span className="chip-val">{formatRupiah(amount)}</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Custom Cash Input */}
-            <div className="price-input-wrapper payment-input-custom">
-              <span className="currency-prefix">Rp</span>
-              <FormattedNumberInput
-                inputRef={cashInputRef}
-                className={`form-input ${isInsufficientCash ? 'warning' : ''}`}
-                placeholder="0"
-                value={cashAmount}
-                onChange={(val) => setCashAmount(val)}
-              />
-            </div>
-
-            {/* Insufficient Cash Notice */}
-            {isInsufficientCash && (
-              <div className="insufficient-alert">
-                <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                <span>
-                  Uang kurang <strong>{formatRupiah(totalAmount - numericCash)}</strong>
-                </span>
+          ) : (
+            /* Skenario 2: Pembayaran Non-Tunai (QRIS / Transfer Bank) */
+            <div className="non-cash-info-card">
+              <div className="non-cash-icon-wrap">
+                {paymentMethod === 'qris' ? <QrCode size={22} /> : <CreditCard size={22} />}
               </div>
-            )}
-
-            {/* Kembalian / Status Display */}
-            {numericCash > 0 && !isInsufficientCash && (
-              <div className="change-display-compact ok">
-                <div className="change-label">
-                  <CheckCircle2 size={16} color="#059669" />
-                  <span>KEMBALIAN:</span>
+              <div className="non-cash-text-wrap">
+                <div className="non-cash-title">
+                  {paymentMethod === 'qris' ? 'Pembayaran QRIS' : 'Pembayaran Transfer Bank'}
                 </div>
-                <span className="change-value">{formatRupiah(Math.max(0, changeAmount))}</span>
+                <div className="non-cash-desc">
+                  Nilai transaksi otomatis pas: <strong>{formatRupiah(totalAmount)}</strong> (Tanpa uang kembalian).
+                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Info Pelanggan & Catatan (opsional, ikut tercetak di struk) */}
           <div className="payment-field-group">
@@ -223,7 +281,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 id="payment-notes"
                 type="text"
                 className="form-input"
-                placeholder="Contoh: tempo / garansi 1 minggu"
+                placeholder={
+                  paymentMethod === 'qris'
+                    ? 'Contoh: QRIS BCA / ShopeePay / GoPay'
+                    : paymentMethod === 'transfer'
+                    ? 'Contoh: Transfer Mandiri / BCA / No. Ref'
+                    : 'Contoh: tempo / garansi 1 minggu'
+                }
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={120}

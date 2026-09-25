@@ -111,7 +111,8 @@ export function buildReceiptBytes(
   // 6. Items
   transaction.items.forEach((item) => {
     add(CMD.BOLD_ON);
-    line(item.name);
+    const itemName = item.isNego ? `${item.name} (Nego)` : item.name;
+    line(itemName);
     add(CMD.BOLD_OFF);
 
     const leftPart = ` ${item.qty} ${item.unit || 'pcs'} x ${formatRupiah(item.price)}`;
@@ -127,7 +128,13 @@ export function buildReceiptBytes(
   line(formatTwoColumns('TOTAL', formatRupiah(transaction.totalAmount)));
   add(CMD.BOLD_OFF);
 
-  line(formatTwoColumns('TUNAI / BAYAR', formatRupiah(transaction.cashAmount)));
+  const payMethodLabel =
+    transaction.paymentMethod === 'qris'
+      ? 'BAYAR (QRIS)'
+      : transaction.paymentMethod === 'transfer'
+      ? 'BAYAR (TRANSFER)'
+      : 'TUNAI / BAYAR';
+  line(formatTwoColumns(payMethodLabel, formatRupiah(transaction.cashAmount)));
   add(CMD.BOLD_ON);
   line(formatTwoColumns('KEMBALIAN', formatRupiah(Math.max(0, transaction.changeAmount))));
   add(CMD.BOLD_OFF);

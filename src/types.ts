@@ -15,6 +15,8 @@ export interface CartItem {
   productId?: string;
   name: string;
   price: number;
+  originalPrice?: number;
+  isNego?: boolean;
   qty: number;
   unit?: string;
   subtotal: number;

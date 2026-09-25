@@ -20,6 +20,7 @@ import { AutocompleteInput } from './AutocompleteInput';
 import { FormattedNumberInput } from './FormattedNumberInput';
 import { ReceiptPreview } from './ReceiptPreview';
 import { PaymentModal } from './PaymentModal';
+import { NegoModal } from './NegoModal';
 import { formatRupiah, formatNumber, parseNumberFromInput } from '../utils/formatters';
 import {
   Plus,
@@ -31,6 +32,7 @@ import {
   Sparkles,
   CreditCard,
   ArrowRight,
+  Tag,
 } from 'lucide-react';
 
 interface KasirViewProps {
@@ -55,11 +57,14 @@ export const KasirView: React.FC<KasirViewProps> = ({
   // Cart & Transaction state
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [invoiceNo, setInvoiceNo] = useState<string>(generateInvoiceNumber());
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'qris'>('cash');
   const [cashAmount, setCashAmount] = useState<string>('');
   const [customerName, setCustomerName] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [showMobilePreview, setShowMobilePreview] = useState<boolean>(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
+  const [negoTargetItem, setNegoTargetItem] = useState<CartItem | null>(null);
+  const [isNegoModalOpen, setIsNegoModalOpen] = useState<boolean>(false);
 
   const nameInputRef = useRef<HTMLInputElement>(null);
   const priceInputRef = useRef<HTMLInputElement>(null);
@@ -167,6 +172,8 @@ export const KasirView: React.FC<KasirViewProps> = ({
         productId: prod.id,
         name: prod.name.trim(),
         price: priceNum,
+        originalPrice: priceNum,
+        isNego: false,
         qty: qtyNum,
         unit: prod.unit || 'Pcs',
         subtotal: priceNum * qtyNum,
@@ -281,6 +288,8 @@ export const KasirView: React.FC<KasirViewProps> = ({
         productId: finalProductId,
         name: trimmedName,
         price: priceNum,
+        originalPrice: priceNum,
+        isNego: false,
         qty: qtyNum,
         unit: finalUnit,
         subtotal: priceNum * qtyNum,
@@ -317,6 +326,43 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
   const handleRemoveCartItem = (id: string) => {
     setCartItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleOpenNegoModal = (item: CartItem) => {
+    setNegoTargetItem(item);
+    setIsNegoModalOpen(true);
+  };
+
+  const handleApplyNego = (itemId: string, newPrice: number, resetToOriginal?: boolean) => {
+    setCartItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.id !== itemId) return item;
+        const baseOriginal =
+          item.originalPrice && item.originalPrice > 0 ? item.originalPrice : item.price;
+        if (resetToOriginal || newPrice === baseOriginal) {
+          return {
+            ...item,
+            price: baseOriginal,
+            originalPrice: undefined,
+            isNego: false,
+            subtotal: baseOriginal * item.qty,
+          };
+        }
+        return {
+          ...item,
+          originalPrice: baseOriginal,
+          price: newPrice,
+          isNego: true,
+          subtotal: newPrice * item.qty,
+        };
+      })
+    );
+    showToast(
+      resetToOriginal
+        ? 'Harga barang dikembalikan ke harga normal'
+        : `Harga nego ${formatRupiah(newPrice)} berhasil diterapkan!`,
+      'success'
+    );
   };
 
   const smartCashSuggestions = React.useMemo(() => {
@@ -367,7 +413,8 @@ export const KasirView: React.FC<KasirViewProps> = ({
     return list;
   }, [totalAmount]);
 
-  const isInsufficientCash = numericCash > 0 && numericCash < totalAmount;
+  const isInsufficientCash =
+    paymentMethod === 'cash' && numericCash > 0 && numericCash < totalAmount;
 
   const handleOpenPaymentModal = () => {
     if (cartItems.length === 0) {
@@ -387,12 +434,15 @@ export const KasirView: React.FC<KasirViewProps> = ({
     setItemName('');
     setItemPrice('');
     setItemQty(1);
+    setPaymentMethod('cash');
     setCashAmount('');
     setCustomerName('');
     setNotes('');
     setSelectedProduct(null);
     setInvoiceNo(generateInvoiceNumber());
     setIsPaymentModalOpen(false);
+    setIsNegoModalOpen(false);
+    setNegoTargetItem(null);
     focusInputIfDesktop(nameInputRef);
   };
 
@@ -403,13 +453,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
       return null;
     }
 
-    if (numericCash > 0 && numericCash < totalAmount) {
-      showToast(`Uang diterima (${formatRupiah(numericCash)}) kurang dari total tagihan (${formatRupiah(totalAmount)})`, 'info');
+    const isNonCash = paymentMethod === 'qris' || paymentMethod === 'transfer';
+    if (!isNonCash && numericCash > 0 && numericCash < totalAmount) {
+      showToast(
+        `Uang diterima (${formatRupiah(numericCash)}) kurang dari total tagihan (${formatRupiah(totalAmount)})`,
+        'info'
+      );
       return null;
     }
 
-    const finalCash = numericCash > 0 ? numericCash : totalAmount;
-    const finalChange = finalCash - totalAmount;
+    const finalCash = isNonCash ? totalAmount : numericCash > 0 ? numericCash : totalAmount;
+    const finalChange = isNonCash ? 0 : Math.max(0, finalCash - totalAmount);
     const activeUser = getCurrentUser();
 
     const transactionData: Transaction = {
@@ -419,8 +473,8 @@ export const KasirView: React.FC<KasirViewProps> = ({
       items: [...cartItems],
       totalAmount,
       cashAmount: finalCash,
-      changeAmount: Math.max(0, finalChange),
-      paymentMethod: 'cash',
+      changeAmount: finalChange,
+      paymentMethod,
       customerName: customerName.trim() || undefined,
       cashierName: activeUser?.name || storeProfile.cashierName || 'Kasir',
       notes: notes.trim() || undefined,
@@ -679,8 +733,32 @@ export const KasirView: React.FC<KasirViewProps> = ({
                             )}
                           </div>
                         </td>
-                        <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
-                          {formatRupiah(item.price)}
+                        <td style={{ textAlign: 'right' }}>
+                          <div className="cart-price-cell">
+                            {item.isNego && item.originalPrice && item.originalPrice !== item.price && (
+                              <span className="cart-original-price">
+                                {formatRupiah(item.originalPrice)}
+                              </span>
+                            )}
+                            <div className="cart-current-price-row">
+                              <span className={`cart-current-price ${item.isNego ? 'is-nego' : ''}`}>
+                                {formatRupiah(item.price)}
+                              </span>
+                              <button
+                                type="button"
+                                className={`btn-table-nego ${item.isNego ? 'active' : ''}`}
+                                onClick={() => handleOpenNegoModal(item)}
+                                title={
+                                  item.isNego
+                                    ? 'Harga dinego, klik untuk ubah atau reset'
+                                    : 'Nego / ubah harga satuan barang ini'
+                                }
+                              >
+                                <Tag size={10} />
+                                <span>{item.isNego ? 'Nego' : 'Nego'}</span>
+                              </button>
+                            </div>
+                          </div>
                         </td>
                         <td>
                           <div className="qty-input-wrapper" style={{ height: '32px', maxWidth: '100px', margin: '0 auto' }}>
@@ -790,8 +868,36 @@ export const KasirView: React.FC<KasirViewProps> = ({
             customerName={customerName}
             cashierName={getCurrentUser()?.name || storeProfile.cashierName}
             notes={notes}
+            paymentMethod={paymentMethod}
           />
         </div>
+
+        {/* Mobile Sticky Checkout Bar (Menempel di atas bottom-nav pada HP/Tablet < 1024px) */}
+        {cartItems.length > 0 && (
+          <div className="mobile-sticky-checkout-bar no-print">
+            <div className="mobile-sticky-info">
+              <span className="mobile-sticky-label">TOTAL TAGIHAN</span>
+              <div className="mobile-sticky-values">
+                <span className="mobile-sticky-amount">{formatRupiah(totalAmount)}</span>
+                <span className="mobile-sticky-items">
+                  ({cartItems.length} item • {totalQty} pcs)
+                </span>
+              </div>
+            </div>
+            <div className="mobile-sticky-actions">
+              <button
+                type="button"
+                className="btn-mobile-sticky-pay"
+                onClick={handleOpenPaymentModal}
+                title="Buka menu pembayaran (F2)"
+              >
+                <CreditCard size={18} />
+                <span>Bayar (F2)</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal Pembayaran & Cetak Struk */}
@@ -801,6 +907,8 @@ export const KasirView: React.FC<KasirViewProps> = ({
         totalAmount={totalAmount}
         cartItems={cartItems}
         invoiceNo={invoiceNo}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
         cashAmount={cashAmount}
         setCashAmount={setCashAmount}
         smartCashSuggestions={smartCashSuggestions}
@@ -816,6 +924,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
         isPrintingBt={isPrintingBt}
         onPrintThermer={handlePrintThermer}
         storeProfile={storeProfile}
+      />
+
+      {/* Modal Nego / Potongan Harga Barang */}
+      <NegoModal
+        isOpen={isNegoModalOpen}
+        item={negoTargetItem}
+        onClose={() => {
+          setIsNegoModalOpen(false);
+          setNegoTargetItem(null);
+        }}
+        onApplyNego={handleApplyNego}
       />
     </>
   );

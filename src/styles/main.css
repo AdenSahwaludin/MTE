@@ -1011,6 +1011,70 @@ button,
   color: var(--danger);
 }
 
+/* Nego Price Display & Button in Cart Table */
+.cart-price-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.cart-original-price {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  text-decoration: line-through;
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.cart-current-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.cart-current-price {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.92rem;
+}
+
+.cart-current-price.is-nego {
+  color: #059669;
+}
+
+.btn-table-nego {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid #bfdbfe;
+  background: #f0f7ff;
+  color: #1d4ed8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.btn-table-nego:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  transform: translateY(-1px);
+}
+
+.btn-table-nego.active {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+  box-shadow: 0 1px 3px rgba(4, 120, 87, 0.12);
+}
+
 .empty-cart-state {
   padding: 2rem 1rem;
   text-align: center;
@@ -1197,6 +1261,467 @@ button,
   transform: scale(0.98);
 }
 
+/* Mobile Sticky Checkout Bar (Always Visible on Mobile/Tablet when Cart Has Items) */
+.mobile-sticky-checkout-bar {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .pos-layout {
+    padding-bottom: 100px; /* Space for mobile sticky checkout bar */
+  }
+
+  .mobile-sticky-checkout-bar {
+    position: fixed;
+    bottom: calc(56px + env(safe-area-inset-bottom));
+    margin-bottom: 6px;
+    left: 0.5rem;
+    right: 0.5rem;
+    width: calc(100% - 1rem);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1.5px solid #cbd5e1;
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.12);
+    padding: 0.65rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    z-index: 45;
+    animation: slideUpSticky 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* iPad / Tablet (768px - 1023px): Tambahan margin bottom & floating pill card */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .pos-layout {
+    padding-bottom: 140px; /* Ruang lega untuk iPad sticky bar dengan margin */
+  }
+
+  .mobile-sticky-checkout-bar {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    margin-bottom: 16px !important; /* Margin bottom khusus iPad agar berjarak nyaman dari bottom nav */
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    width: calc(100% - 2.5rem);
+    max-width: 780px;
+    border-radius: 16px;
+    border: 1.5px solid #bfdbfe;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+    padding: 0.75rem 1.25rem;
+  }
+}
+
+  .mobile-sticky-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .mobile-sticky-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+
+  .mobile-sticky-values {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .mobile-sticky-amount {
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: #1d4ed8;
+    font-family: var(--font-mono);
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+  }
+
+  .mobile-sticky-items {
+    font-size: 0.74rem;
+    color: #64748b;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .mobile-sticky-actions {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .btn-mobile-sticky-pay {
+    background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
+    color: #ffffff !important;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.65rem 1.15rem;
+    font-size: 0.92rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 4px 12px rgba(21, 101, 192, 0.35);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: all 0.15s ease;
+  }
+
+  .btn-mobile-sticky-pay:active {
+    transform: scale(0.97);
+  }
+}
+
+@keyframes slideUpSticky {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Payment Method Badges in History */
+.badge-pay-method {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.badge-pay-method.cash {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.badge-pay-method.qris {
+  background: #f5f3ff;
+  color: #6d28d9;
+  border: 1px solid #ddd6fe;
+}
+
+.badge-pay-method.transfer {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+/* Test Print Button in Settings */
+.btn-test-print {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #ffffff;
+  color: #0369a1;
+  border: 1.5px solid #0284c7;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(2, 132, 199, 0.12);
+  touch-action: manipulation;
+}
+
+.btn-test-print:hover:not(:disabled) {
+  background: #f0f9ff;
+  border-color: #0369a1;
+  transform: translateY(-1px);
+}
+
+.btn-test-print:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-test-print:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   NEGO / BARGAINING MODAL STYLES
+   ========================================================= */
+
+.nego-modal-container {
+  max-width: 440px !important;
+  width: 100%;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2) !important;
+}
+
+.nego-modal-header {
+  padding: 0.85rem 1.15rem !important;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+}
+
+.nego-modal-title {
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.nego-modal-body {
+  padding: 1rem 1.15rem !important;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem !important;
+}
+
+.nego-item-info-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nego-item-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.nego-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.nego-subtotal-normal {
+  font-size: 0.74rem;
+  color: #64748b;
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.nego-input-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.nego-quick-discounts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.nego-presets-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.nego-presets-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.btn-nego-preset {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  color: #334155;
+  border-radius: 8px;
+  padding: 4px 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+}
+
+.btn-nego-preset:hover {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.btn-nego-preset:active {
+  transform: scale(0.96);
+}
+
+.nego-calc-summary {
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1.5px solid transparent;
+}
+
+.nego-calc-summary.discount {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.nego-calc-summary.equal {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.nego-calc-summary.higher {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.nego-calc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #047857;
+}
+
+.nego-calc-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.nego-calc-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.nego-calc-row.total-saving {
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: #065f46;
+  border-top: 1px dashed #a7f3d0;
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.nego-saving-highlight {
+  font-family: var(--font-mono);
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #059669;
+}
+
+.nego-calc-subtotal {
+  font-size: 0.78rem;
+  color: #0f172a;
+  margin-top: 2px;
+  text-align: right;
+}
+
+.nego-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.btn-primary-nego {
+  width: 100%;
+  min-height: 44px;
+  background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3);
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.btn-primary-nego:hover:not(:disabled) {
+  box-shadow: 0 6px 16px rgba(21, 101, 192, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-primary-nego:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-primary-nego:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-reset-nego {
+  width: 100%;
+  min-height: 38px;
+  background: #ffffff;
+  border: 1.5px solid #f87171;
+  color: #dc2626;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+}
+
+.btn-reset-nego:hover {
+  background: #fef2f2;
+}
+
+.btn-cancel-nego {
+  width: 100%;
+  min-height: 36px;
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-cancel-nego:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
 /* =========================================================
    PAYMENT MODAL (CLEAN LIGHT THEME & RICH ACTION BUTTONS)
    ========================================================= */
@@ -1293,6 +1818,89 @@ button,
   font-family: var(--font-mono);
   letter-spacing: -0.5px;
   line-height: 1;
+}
+
+/* Segmented Payment Method Selector */
+.payment-method-selector {
+  display: flex;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 12px;
+  gap: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.method-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.method-tab-btn:hover {
+  color: #1e293b;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.method-tab-btn.active {
+  background: #ffffff;
+  color: #1d4ed8;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.non-cash-info-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  margin-top: 2px;
+}
+
+.non-cash-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #dbeafe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1d4ed8;
+  flex-shrink: 0;
+}
+
+.non-cash-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.non-cash-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.non-cash-desc {
+  font-size: 0.74rem;
+  color: #2563eb;
+  line-height: 1.35;
 }
 
 .payment-field-group {

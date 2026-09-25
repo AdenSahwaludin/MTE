@@ -187,7 +187,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                           <div style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                             {t.invoiceNo}
                           </div>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '3px', fontSize: '0.75rem' }}>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '3px', fontSize: '0.75rem', alignItems: 'center' }}>
+                            <span className={`badge-pay-method ${t.paymentMethod || 'cash'}`}>
+                              {t.paymentMethod === 'qris'
+                                ? 'QRIS'
+                                : t.paymentMethod === 'transfer'
+                                ? 'Transfer'
+                                : 'Tunai'}
+                            </span>
                             {t.cashierName && (
                               <span style={{ color: '#0369a1', background: '#f0f9ff', padding: '1px 6px', borderRadius: '4px', border: '1px solid #bae6fd', fontWeight: 500 }}>
                                 Kasir: {t.cashierName}

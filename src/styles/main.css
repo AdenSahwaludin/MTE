@@ -1153,9 +1153,19 @@ button,
 
 .checkout-actions-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
   gap: 0.65rem;
   align-items: center;
+}
+
+@media (max-width: 640px) {
+  .checkout-actions-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .btn-secondary-reset {
+    grid-column: span 2;
+    min-height: 44px;
+  }
 }
 
 .btn-primary-checkout {
@@ -1164,19 +1174,19 @@ button,
   color: white;
   border: none;
   border-radius: 10px;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 800;
   font-family: var(--font-brand);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
   touch-action: manipulation;
   transition: all 0.2s ease;
   letter-spacing: 0.3px;
-  padding: 0 1.25rem;
+  padding: 0 1rem;
 }
 
 .btn-primary-checkout:hover:not(:disabled) {
@@ -1190,6 +1200,44 @@ button,
 }
 
 .btn-primary-checkout:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+.btn-primary-print {
+  min-height: 52px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-family: var(--font-brand);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+  touch-action: manipulation;
+  transition: all 0.2s ease;
+  letter-spacing: 0.3px;
+  padding: 0 1rem;
+}
+
+.btn-primary-print:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  box-shadow: 0 6px 18px rgba(5, 150, 105, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-primary-print:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-primary-print:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   background: #94a3b8;
@@ -1356,6 +1404,7 @@ button,
   .mobile-sticky-actions {
     display: flex;
     align-items: center;
+    gap: 6px;
     flex-shrink: 0;
   }
 
@@ -1364,12 +1413,12 @@ button,
     color: #ffffff !important;
     border: none;
     border-radius: var(--radius-md);
-    padding: 0.65rem 1.15rem;
-    font-size: 0.92rem;
+    padding: 0.65rem 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     box-shadow: 0 4px 12px rgba(21, 101, 192, 0.35);
     cursor: pointer;
     touch-action: manipulation;
@@ -1378,6 +1427,32 @@ button,
 
   .btn-mobile-sticky-pay:active {
     transform: scale(0.97);
+  }
+
+  .btn-mobile-sticky-print {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    color: #ffffff !important;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 0.65rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: all 0.15s ease;
+  }
+
+  .btn-mobile-sticky-print:active {
+    transform: scale(0.97);
+  }
+
+  .btn-mobile-sticky-print:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
 @keyframes slideUpSticky {

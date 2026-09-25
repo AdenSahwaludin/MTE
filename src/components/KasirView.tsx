@@ -33,6 +33,7 @@ import {
   CreditCard,
   ArrowRight,
   Tag,
+  Bluetooth,
 } from 'lucide-react';
 
 const CART_STORAGE_KEY = 'mte_pos_pending_cart';
@@ -152,7 +153,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
     }, 800);
   };
 
-  // Keyboard shortcut global (F2 = Buka Bayar, F4 = Reset).
+  // Keyboard shortcut global (F2 = Buka Bayar, F3 = Cetak Langsung, F4 = Reset).
   // Hanya aktif saat tab Kasir aktif (agar tidak bentrok saat di tab lain)
   useEffect(() => {
     if (!isActive) return;
@@ -161,6 +162,10 @@ export const KasirView: React.FC<KasirViewProps> = ({
         if (isPaymentModalOpen) return; // biarkan PaymentModal yang handle
         e.preventDefault();
         handleOpenPaymentModal();
+      } else if (e.key === 'F3') {
+        if (isPaymentModalOpen) return;
+        e.preventDefault();
+        handlePrintBluetooth();
       } else if (e.key === 'F4') {
         e.preventDefault();
         handleResetTransaction();
@@ -622,7 +627,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 <ShoppingCart size={20} color="#2563eb" /> Kasir
               </h2>
               <div className="shortcut-tip hide-on-mobile">
-                <Keyboard size={14} /> <kbd>Enter</kbd> Tambah &bull; <kbd>F2</kbd> Bayar &bull; <kbd>F4</kbd> Reset
+                <Keyboard size={14} /> <kbd>Enter</kbd> Tambah &bull; <kbd>F2</kbd> Bayar &bull; <kbd>F3</kbd> Cetak &bull; <kbd>F4</kbd> Reset
               </div>
             </div>
 
@@ -853,7 +858,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
               <span className="totals-amount">{formatRupiah(totalAmount)}</span>
             </div>
 
-            {/* Primary Checkout & Reset Buttons */}
+            {/* Primary Checkout, Direct Bluetooth 58mm Print, & Reset Buttons */}
             <div className="checkout-actions-row">
               <button
                 type="button"
@@ -862,9 +867,19 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 disabled={cartItems.length === 0}
                 title="Buka menu pembayaran (F2)"
               >
-                <CreditCard size={20} />
+                <CreditCard size={19} />
                 <span>Bayar<span className="btn-shortcut-tag"> (F2)</span></span>
-                <ArrowRight size={18} />
+              </button>
+
+              <button
+                type="button"
+                className="btn-primary-print"
+                onClick={handlePrintBluetooth}
+                disabled={cartItems.length === 0 || isPrintingBt}
+                title="Cetak langsung ke printer Bluetooth Thermal 58mm (F3)"
+              >
+                <Bluetooth size={19} className={isPrintingBt ? 'animate-spin' : ''} />
+                <span>{isPrintingBt ? 'Mencetak...' : 'Cetak 58mm'}<span className="btn-shortcut-tag"> (F3)</span></span>
               </button>
 
               <button
@@ -927,9 +942,19 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 onClick={handleOpenPaymentModal}
                 title="Buka menu pembayaran (F2)"
               >
-                <CreditCard size={18} />
-                <span>Bayar (F2)</span>
-                <ArrowRight size={16} />
+                <CreditCard size={17} />
+                <span>Bayar</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn-mobile-sticky-print"
+                onClick={handlePrintBluetooth}
+                disabled={isPrintingBt}
+                title="Cetak langsung ke printer Bluetooth 58mm"
+              >
+                <Bluetooth size={17} className={isPrintingBt ? 'animate-spin' : ''} />
+                <span>{isPrintingBt ? 'Mencetak...' : 'Cetak 58mm'}</span>
               </button>
             </div>
           </div>

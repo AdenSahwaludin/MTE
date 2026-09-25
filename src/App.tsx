@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Product, Transaction, StoreProfile, UserAccount } from './types';
 import {
   getProducts,
@@ -38,7 +38,16 @@ export const App: React.FC = () => {
   });
   const [showSplash, setShowSplash] = useState<boolean>(() => isAppOrPwa() && Boolean(validateAndRefreshSession()));
   const [isSplashPreview, setIsSplashPreview] = useState<boolean>(false);
-  const [currentTab, setCurrentTab] = useState<NavTab>('kasir');
+  const [currentTab, setCurrentTab] = useState<NavTab>(() => {
+    try {
+      const savedTab = sessionStorage.getItem('mte_active_tab') as NavTab;
+      if (savedTab && ['kasir', 'products', 'history', 'settings'].includes(savedTab)) {
+        return savedTab;
+      }
+    } catch {}
+    return 'kasir';
+  });
+  const scrollPositions = useRef<Record<string, number>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [storeProfile, setStoreProfile] = useState<StoreProfile>(getStoreProfile());
@@ -118,6 +127,10 @@ export const App: React.FC = () => {
     setCurrentUserState(null);
     setIsAuthenticated(false);
     setCurrentTab('kasir');
+    try {
+      sessionStorage.removeItem('mte_active_tab');
+      sessionStorage.removeItem('mte_pos_pending_cart');
+    } catch {}
   };
 
   const handleSelectTab = (tab: NavTab) => {
@@ -125,7 +138,19 @@ export const App: React.FC = () => {
       showToast('Akses ditolak: Menu Pengaturan hanya untuk Administrator.', 'info');
       return;
     }
+    // Simpan posisi scroll menu saat ini
+    scrollPositions.current[currentTab] = window.scrollY;
+
     setCurrentTab(tab);
+    try {
+      sessionStorage.setItem('mte_active_tab', tab);
+    } catch {}
+
+    // Pulihkan posisi scroll menu yang dituju
+    setTimeout(() => {
+      const savedY = scrollPositions.current[tab] || 0;
+      window.scrollTo({ top: savedY, behavior: 'instant' });
+    }, 0);
   };
 
   const handleProductUpdated = () => {
@@ -177,40 +202,59 @@ export const App: React.FC = () => {
         />
 
         <main className="main-content">
-          {currentTab === 'kasir' && (
+          {/* Menu Kasir: Komponen tetap mounted agar isi keranjang, nego, bayar, & inputan tidak hilang */}
+          <div
+            className="tab-panel tab-panel-kasir"
+            style={{ display: currentTab === 'kasir' ? 'block' : 'none' }}
+          >
             <KasirView
               storeProfile={storeProfile}
               onProductUpdated={handleProductUpdated}
               onTransactionCreated={handleTransactionUpdated}
               showToast={showToast}
+              isActive={currentTab === 'kasir'}
             />
-          )}
+          </div>
 
-          {currentTab === 'products' && (
+          {/* Menu Produk: Komponen tetap mounted agar pencarian & kategori filter tidak hilang */}
+          <div
+            className="tab-panel tab-panel-products"
+            style={{ display: currentTab === 'products' ? 'block' : 'none' }}
+          >
             <ProductListView
               products={products}
               onRefresh={handleProductUpdated}
               showToast={showToast}
             />
-          )}
+          </div>
 
-          {currentTab === 'history' && (
+          {/* Menu Riwayat: Komponen tetap mounted agar pencarian & detail struk yang dibuka tidak hilang */}
+          <div
+            className="tab-panel tab-panel-history"
+            style={{ display: currentTab === 'history' ? 'block' : 'none' }}
+          >
             <HistoryView
               transactions={transactions}
               storeProfile={storeProfile}
               onRefresh={handleTransactionUpdated}
               showToast={showToast}
             />
-          )}
+          </div>
 
-          {currentTab === 'settings' && isAdmin && (
-            <SettingsView
-              storeProfile={storeProfile}
-              onUpdateProfile={handleProfileUpdated}
-              showToast={showToast}
-              onDataReset={loadData}
-              onPreviewSplash={handlePreviewSplash}
-            />
+          {/* Menu Pengaturan: Komponen tetap mounted agar isian form & status printer tidak hilang */}
+          {isAdmin && (
+            <div
+              className="tab-panel tab-panel-settings"
+              style={{ display: currentTab === 'settings' ? 'block' : 'none' }}
+            >
+              <SettingsView
+                storeProfile={storeProfile}
+                onUpdateProfile={handleProfileUpdated}
+                showToast={showToast}
+                onDataReset={loadData}
+                onPreviewSplash={handlePreviewSplash}
+              />
+            </div>
           )}
         </main>
 

@@ -35,11 +35,14 @@ import {
   Tag,
 } from 'lucide-react';
 
-interface KasirViewProps {
+const CART_STORAGE_KEY = 'mte_pos_pending_cart';
+
+export interface KasirViewProps {
   storeProfile: StoreProfile;
   onProductUpdated: () => void;
   onTransactionCreated?: () => void;
   showToast: (msg: string, type?: 'success' | 'info') => void;
+  isActive?: boolean;
 }
 
 export const KasirView: React.FC<KasirViewProps> = ({
@@ -47,6 +50,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
   onProductUpdated,
   onTransactionCreated,
   showToast,
+  isActive = true,
 }) => {
   // Input fields for current item
   const [itemName, setItemName] = useState<string>('');
@@ -55,7 +59,27 @@ export const KasirView: React.FC<KasirViewProps> = ({
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // Cart & Transaction state
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(CART_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (cartItems.length > 0) {
+        sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
+      } else {
+        sessionStorage.removeItem(CART_STORAGE_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  }, [cartItems]);
+
   const [invoiceNo, setInvoiceNo] = useState<string>(generateInvoiceNumber());
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'qris'>('cash');
   const [cashAmount, setCashAmount] = useState<string>('');
@@ -129,9 +153,9 @@ export const KasirView: React.FC<KasirViewProps> = ({
   };
 
   // Keyboard shortcut global (F2 = Buka Bayar, F4 = Reset).
-  // F3 (Simpan) sengaja TIDAK ditangani di sini saat modal terbuka —
-  // ditangani PaymentModal agar tidak double-fire 2 listener.
+  // Hanya aktif saat tab Kasir aktif (agar tidak bentrok saat di tab lain)
   useEffect(() => {
+    if (!isActive) return;
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'F2') {
         if (isPaymentModalOpen) return; // biarkan PaymentModal yang handle
@@ -144,7 +168,14 @@ export const KasirView: React.FC<KasirViewProps> = ({
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [isPaymentModalOpen]);
+  }, [isActive, isPaymentModalOpen]);
+
+  // Re-focus input kasir saat kembali ke tab Kasir di desktop
+  useEffect(() => {
+    if (isActive) {
+      focusInputIfDesktop(nameInputRef);
+    }
+  }, [isActive]);
 
   // Add item directly to cart from autocomplete suggestion on Enter
   const addItemToCartDirect = (prod: Product, qty: number = 1) => {
@@ -430,6 +461,11 @@ export const KasirView: React.FC<KasirViewProps> = ({
   };
 
   const handleResetTransaction = () => {
+    try {
+      sessionStorage.removeItem(CART_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
     setCartItems([]);
     setItemName('');
     setItemPrice('');

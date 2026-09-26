@@ -4106,56 +4106,129 @@ button,
 
 /* =========================================================
    VOICE AI CASHIER FLOATING ACTION BUTTON & INTERACTIVE CARD
+   Liquid Glass Theme Blue Aesthetic - Clean Non-Obtrusive Circle
    ========================================================= */
 
 .voice-fab-container {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 28px;
+  right: 28px;
   z-index: 1050;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  transition: bottom 0.28s cubic-bezier(0.16, 1, 0.3, 1), right 0.28s ease;
+}
+
+/* Tablet & Mobile Screens: Posisi di atas bottom navigation bar */
+@media (max-width: 1023px) {
+  .voice-fab-container {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    right: 16px;
+  }
+
+  /* Saat ada item belanja di kasir (sticky checkout bar aktif), naikkan agar tidak menutupi tombol bayar */
+  .voice-fab-container.has-cart {
+    bottom: calc(132px + env(safe-area-inset-bottom));
+    right: 16px;
+  }
 }
 
 .voice-fab-btn {
-  height: 52px;
-  padding: 0 20px;
-  border-radius: 9999px;
-  border: none;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #ec4899 100%);
-  color: #ffffff;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  padding: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: 0.95rem;
-  letter-spacing: 0.01em;
+  justify-content: center;
+  /* Liquid Glass Blue Theme Gradient */
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.9) 0%, rgba(21, 101, 192, 0.94) 50%, rgba(13, 71, 161, 0.98) 100%);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 
+    0 10px 25px -4px rgba(21, 101, 192, 0.55),
+    0 0 20px rgba(56, 189, 248, 0.35),
+    inset 0 2px 4px rgba(255, 255, 255, 0.7),
+    inset 0 -2px 6px rgba(13, 71, 161, 0.45);
+  color: #ffffff;
   cursor: pointer;
-  box-shadow: 0 8px 24px -4px rgba(124, 58, 237, 0.55), 0 0 16px rgba(236, 72, 153, 0.4);
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: visible;
   user-select: none;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+}
+
+/* Liquid Glass Curved Gloss Highlight */
+.voice-fab-btn::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 15%;
+  right: 15%;
+  height: 44%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border-radius: 9999px 9999px 50% 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Subtle Specular Radial Shimmer */
+.voice-fab-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.45) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .voice-fab-btn:hover {
-  transform: translateY(-3px) scale(1.03);
-  box-shadow: 0 12px 30px -4px rgba(124, 58, 237, 0.65), 0 0 24px rgba(236, 72, 153, 0.55);
+  transform: translateY(-3px) scale(1.06);
+  box-shadow: 
+    0 14px 30px -4px rgba(21, 101, 192, 0.65),
+    0 0 26px rgba(56, 189, 248, 0.5),
+    inset 0 2px 6px rgba(255, 255, 255, 0.85),
+    inset 0 -3px 8px rgba(13, 71, 161, 0.5);
+  border-color: rgba(255, 255, 255, 0.85);
 }
 
 .voice-fab-btn:active {
-  transform: translateY(0) scale(0.97);
+  transform: translateY(0) scale(0.95);
+  box-shadow: 
+    0 6px 18px -2px rgba(21, 101, 192, 0.5),
+    inset 0 1px 3px rgba(255, 255, 255, 0.5);
 }
 
+/* Sedang Mendengarkan (Listening): Liquid Red Glow */
 .voice-fab-btn.listening {
-  background: linear-gradient(135deg, #dc2626 0%, #ea580c 50%, #f59e0b 100%);
-  box-shadow: 0 8px 25px -2px rgba(220, 38, 38, 0.6), 0 0 20px rgba(245, 158, 11, 0.5);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 50%, rgba(185, 28, 28, 0.98) 100%);
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 
+    0 10px 28px -2px rgba(220, 38, 38, 0.65), 
+    0 0 24px rgba(248, 113, 113, 0.55),
+    inset 0 2px 4px rgba(255, 255, 255, 0.7), 
+    inset 0 -2px 6px rgba(153, 27, 27, 0.5);
 }
 
+/* Sedang Memproses (Processing): Liquid Royal Blue */
 .voice-fab-btn.processing {
-  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.95) 0%, rgba(30, 64, 175, 0.95) 50%, rgba(13, 71, 161, 0.98) 100%);
+  border-color: rgba(255, 255, 255, 0.65);
+  box-shadow: 
+    0 10px 28px -2px rgba(37, 99, 235, 0.65), 
+    0 0 22px rgba(56, 189, 248, 0.45),
+    inset 0 2px 4px rgba(255, 255, 255, 0.7), 
+    inset 0 -2px 6px rgba(13, 71, 161, 0.5);
+}
+
+.voice-fab-icon {
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
 }
 
 .voice-idle-icon-wrapper {
@@ -4163,15 +4236,17 @@ button,
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
 }
 
 .voice-sparkle-badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: -5px;
+  right: -5px;
   color: #fde047;
-  filter: drop-shadow(0 0 4px rgba(253, 224, 71, 0.8));
+  filter: drop-shadow(0 0 4px rgba(253, 224, 71, 0.85));
   animation: pulseSparkle 2s infinite ease-in-out;
+  z-index: 3;
 }
 
 @keyframes pulseSparkle {
@@ -4184,6 +4259,7 @@ button,
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
 }
 
 .voice-ring-pulse,
@@ -4191,8 +4267,8 @@ button,
   position: absolute;
   width: 100%;
   height: 100%;
-  border-radius: 9999px;
-  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
   animation: ringPulse 1.6s infinite cubic-bezier(0, 0.2, 0.8, 1);
   pointer-events: none;
 }
@@ -4203,11 +4279,7 @@ button,
 
 @keyframes ringPulse {
   0% { transform: scale(1); opacity: 0.9; }
-  100% { transform: scale(2.2); opacity: 0; }
-}
-
-.voice-fab-label {
-  white-space: nowrap;
+  100% { transform: scale(2.4); opacity: 0; }
 }
 
 /* Floating AI Card */
@@ -4219,8 +4291,8 @@ button,
   max-width: calc(100vw - 32px);
   background: #ffffff;
   border-radius: 20px;
-  border: 1px solid rgba(124, 58, 237, 0.2);
-  box-shadow: 0 20px 45px -8px rgba(15, 23, 42, 0.25), 0 0 25px rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(33, 150, 243, 0.25);
+  box-shadow: 0 20px 45px -8px rgba(15, 23, 42, 0.25), 0 0 25px rgba(33, 150, 243, 0.15);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -4241,8 +4313,8 @@ button,
 
 .voice-ai-header {
   padding: 14px 18px;
-  background: linear-gradient(135deg, #f5f3ff 0%, #faf5ff 100%);
-  border-bottom: 1px solid #ede9fe;
+  background: linear-gradient(135deg, #f0f7ff 0%, #e0f2fe 100%);
+  border-bottom: 1px solid #bae6fd;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4258,25 +4330,25 @@ button,
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+  background: linear-gradient(135deg, #2196F3 0%, #1565C0 100%);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35);
+  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.35);
 }
 
 .voice-ai-title {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #1e1b4b;
+  color: #0f172a;
   line-height: 1.2;
 }
 
 .voice-ai-subtitle {
   font-size: 0.72rem;
-  color: #7c3aed;
+  color: #0284c7;
   font-weight: 600;
 }
 
@@ -4324,7 +4396,7 @@ button,
 
 .wave-bar {
   width: 5px;
-  background: linear-gradient(180deg, #ec4899 0%, #7c3aed 100%);
+  background: linear-gradient(180deg, #38bdf8 0%, #1565C0 100%);
   border-radius: 9999px;
   animation: soundWave 1s infinite ease-in-out;
 }
@@ -4357,12 +4429,12 @@ button,
 }
 
 .voice-proc-spinner {
-  color: #7c3aed;
+  color: #1565C0;
 }
 
 .voice-proc-status {
   font-size: 0.85rem;
-  color: #4338ca;
+  color: #1e3a8a;
   font-weight: 600;
   margin: 0;
 }
@@ -4417,7 +4489,7 @@ button,
 
 .voice-transcript-text {
   font-size: 0.88rem;
-  color: #1e1b4b;
+  color: #0f172a;
   font-weight: 600;
   line-height: 1.4;
   margin: 0;
@@ -4483,7 +4555,7 @@ button,
   height: 30px;
   border-radius: 8px;
   border: none;
-  background: #7c3aed;
+  background: #1565C0;
   color: white;
   display: flex;
   align-items: center;
@@ -4498,7 +4570,7 @@ button,
 }
 
 .voice-manual-send-btn:not(:disabled):hover {
-  background: #6d28d9;
+  background: #0D47A1;
 }
 
 .voice-ai-footer {
@@ -4516,17 +4588,25 @@ button,
 
 @media (max-width: 640px) {
   .voice-fab-container {
-    bottom: 20px;
-    right: 16px;
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    right: 14px;
+  }
+  .voice-fab-container.has-cart {
+    bottom: calc(128px + env(safe-area-inset-bottom));
+    right: 14px;
   }
   .voice-fab-btn {
+    width: 48px;
     height: 48px;
-    padding: 0 16px;
-    font-size: 0.88rem;
+  }
+  .voice-fab-icon {
+    width: 22px;
+    height: 22px;
   }
   .voice-ai-card {
-    width: calc(100vw - 32px);
+    width: calc(100vw - 28px);
     right: 0;
+    max-height: 80vh;
   }
 }
 

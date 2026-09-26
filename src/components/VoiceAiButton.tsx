@@ -26,6 +26,7 @@ export interface VoiceAiButtonProps {
   onResult: (result: VoiceAiParseResult) => void;
   showToast: (msg: string, type?: 'success' | 'info') => void;
   isActive?: boolean;
+  hasCart?: boolean;
 }
 
 export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
@@ -33,6 +34,7 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
   onResult,
   showToast,
   isActive = true,
+  hasCart = false,
 }) => {
   const [isSupported, setIsSupported] = useState<boolean>(true);
   const [isListening, setIsListening] = useState<boolean>(false);
@@ -258,8 +260,8 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
 
   return (
     <>
-      {/* FLOATING ACTION BUTTON (FAB) DENGAN GLOW CYBER */}
-      <div className="voice-fab-container">
+      {/* FLOATING ACTION BUTTON (FAB) DENGAN LIQUID GLASS THEME BLUE */}
+      <div className={`voice-fab-container ${hasCart ? 'has-cart' : ''}`}>
         <button
           type="button"
           id="btn-voice-ai-fab"
@@ -273,26 +275,29 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
               setIsCardOpen(false);
             }
           }}
-          title="AI Suara Kasir - Bicara untuk buat struk otomatis (Shortcut F8)"
+          title={
+            isProcessing
+              ? 'AI sedang memproses suara...'
+              : isListening
+              ? 'Klik untuk selesai bicara & buat transaksi'
+              : 'AI Suara Kasir (F8) - Bicara untuk buat transaksi otomatis'
+          }
+          aria-label="AI Suara Kasir"
         >
           {isProcessing ? (
-            <Loader2 className="voice-fab-icon spin" size={26} />
+            <Loader2 className="voice-fab-icon spin" size={24} />
           ) : isListening ? (
             <div className="voice-mic-active-wrapper">
-              <Mic className="voice-fab-icon mic-pulse" size={26} />
+              <Mic className="voice-fab-icon mic-pulse" size={24} />
               <span className="voice-ring-pulse" />
               <span className="voice-ring-pulse-2" />
             </div>
           ) : (
             <div className="voice-idle-icon-wrapper">
-              <Sparkles className="voice-sparkle-badge" size={14} />
-              <Mic className="voice-fab-icon" size={26} />
+              <Sparkles className="voice-sparkle-badge" size={13} />
+              <Mic className="voice-fab-icon" size={24} />
             </div>
           )}
-
-          <span className="voice-fab-label">
-            {isProcessing ? 'AI Berpikir...' : isListening ? 'Selesai Bicara' : 'AI Suara (F8)'}
-          </span>
         </button>
 
         {/* FLOATING DIALOG CARD SAAT MENDENGARKAN ATAU MEMPROSES */}

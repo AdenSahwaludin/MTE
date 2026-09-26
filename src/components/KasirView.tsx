@@ -1106,6 +1106,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
         onResult={handleVoiceAiResult}
         showToast={showToast}
         isActive={isActive}
+        hasCart={cartItems.length > 0}
       />
     </>
   );

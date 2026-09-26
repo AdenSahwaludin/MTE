@@ -181,27 +181,57 @@ export interface SearchMatch {
 export const searchProducts = (query: string): SearchMatch[] => {
   if (!query || !query.trim()) return [];
   const q = query.trim().toLowerCase();
+  const tokens = q.split(/[\s,/-]+/).filter((t) => t.length > 0);
   const products = getProducts();
-  const results: SearchMatch[] = [];
+  const results: { match: SearchMatch; score: number }[] = [];
 
   for (const product of products) {
-    const nameMatch = product.name.toLowerCase().includes(q);
+    const pName = product.name.toLowerCase();
+    const exactName = pName.includes(q);
     const matchedAlias = product.aliases.find((a) => a.toLowerCase().includes(q));
 
-    if (nameMatch) {
-      results.push({ product, matchedBy: 'name' });
-    } else if (matchedAlias) {
-      results.push({ product, matchedBy: 'alias', matchText: matchedAlias });
+    if (exactName) {
+      results.push({
+        match: { product, matchedBy: 'name' },
+        score: pName.startsWith(q) ? 100 : 80,
+      });
+      continue;
+    }
+
+    if (matchedAlias) {
+      results.push({
+        match: { product, matchedBy: 'alias', matchText: matchedAlias },
+        score: 75,
+      });
+      continue;
+    }
+
+    // Token-based matching (kata bolak-balik: contoh "bearing dinamo" -> cocok dengan "Dinamo/Mesin Kipas Bearing")
+    if (tokens.length > 1) {
+      const allTokensInName = tokens.every((tok) => pName.includes(tok));
+      if (allTokensInName) {
+        results.push({
+          match: { product, matchedBy: 'name' },
+          score: 60,
+        });
+        continue;
+      }
+
+      // Cek apakah semua token ada di gabungan nama + alias
+      const fullText = (pName + ' ' + (product.aliases || []).join(' ')).toLowerCase();
+      const allTokensInFull = tokens.every((tok) => fullText.includes(tok));
+      if (allTokensInFull) {
+        results.push({
+          match: { product, matchedBy: 'alias' },
+          score: 50,
+        });
+      }
     }
   }
 
-  return results.sort((a, b) => {
-    const aStartsWith = a.product.name.toLowerCase().startsWith(q);
-    const bStartsWith = b.product.name.toLowerCase().startsWith(q);
-    if (aStartsWith && !bStartsWith) return -1;
-    if (!aStartsWith && bStartsWith) return 1;
-    return a.product.name.localeCompare(b.product.name);
-  });
+  return results
+    .sort((a, b) => b.score - a.score || a.match.product.name.localeCompare(b.match.product.name))
+    .map((r) => r.match);
 };
 
 // ID unik lintas device tanpa server-sequence: timestamp base36 + random.

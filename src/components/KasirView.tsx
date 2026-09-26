@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Product, CartItem, Transaction, StoreProfile } from '../types';
 import {
   findProductByNameOrAlias,
+  searchProducts,
+  getProducts,
   addOrUpdateProduct,
   saveTransaction,
   generateInvoiceNumber,
@@ -16,6 +18,8 @@ import {
   printNativeDirect,
 } from '../services/nativePrintService';
 import { syncService } from '../services/syncService';
+import { VoiceAiButton } from './VoiceAiButton';
+import { VoiceAiParseResult } from '../services/voiceAiService';
 import { AutocompleteInput } from './AutocompleteInput';
 import { FormattedNumberInput } from './FormattedNumberInput';
 import { ReceiptPreview } from './ReceiptPreview';
@@ -452,6 +456,104 @@ export const KasirView: React.FC<KasirViewProps> = ({
   const isInsufficientCash =
     paymentMethod === 'cash' && numericCash > 0 && numericCash < totalAmount;
 
+  // Handler hasil dari Voice AI Assistant
+  const handleVoiceAiResult = (result: VoiceAiParseResult) => {
+    if (!result.items || result.items.length === 0) {
+      showToast('Tidak ada barang yang terdeteksi dari ucapan suara.', 'info');
+      return;
+    }
+
+    let updatedCart = [...cartItems];
+    let totalQty = 0;
+    let missingPriceItemName: string | null = null;
+
+    for (const item of result.items) {
+      totalQty += item.qty;
+
+      // Resolusi pintar: Jika belum ada matchedProductId, cocokkan ke katalog produk toko
+      let resolvedId = item.matchedProductId;
+      let resolvedName = item.name;
+      let resolvedPrice = item.price;
+      let resolvedUnit = item.unit || 'Pcs';
+      let resolvedIsNew = item.isNew;
+
+      if (!resolvedId) {
+        const matches = searchProducts(item.name);
+        if (matches.length > 0) {
+          const matched = matches[0].product;
+          resolvedId = matched.id;
+          resolvedName = matched.name;
+          if (resolvedPrice <= 0) {
+            resolvedPrice = matched.price;
+          }
+          resolvedUnit = matched.unit || 'Pcs';
+          resolvedIsNew = false;
+        }
+      }
+
+      const existingIndex = updatedCart.findIndex(
+        (c) =>
+          (resolvedId && c.productId === resolvedId) ||
+          c.name.trim().toLowerCase() === resolvedName.trim().toLowerCase()
+      );
+
+      if (existingIndex !== -1) {
+        const existing = updatedCart[existingIndex];
+        const newQty = existing.qty + item.qty;
+        const price = resolvedPrice > 0 ? resolvedPrice : existing.price;
+        updatedCart[existingIndex] = {
+          ...existing,
+          qty: newQty,
+          price,
+          subtotal: price * newQty,
+        };
+      } else {
+        const newItem: CartItem = {
+          id: generateCartItemId(),
+          productId: resolvedId,
+          name: resolvedName,
+          price: resolvedPrice,
+          originalPrice: resolvedPrice,
+          isNego: false,
+          qty: item.qty,
+          unit: resolvedUnit,
+          subtotal: resolvedPrice * item.qty,
+          isNewProduct: resolvedIsNew,
+        };
+        updatedCart.push(newItem);
+        if (resolvedPrice <= 0 && !missingPriceItemName) {
+          missingPriceItemName = resolvedName;
+        }
+      }
+    }
+
+    setCartItems(updatedCart);
+
+    // Otomatis terapkan info pembayaran jika disebutkan kasir
+    if (result.payment?.cashAmount && result.payment.cashAmount > 0) {
+      setCashAmount(result.payment.cashAmount.toString());
+    }
+    if (result.payment?.paymentMethod) {
+      setPaymentMethod(result.payment.paymentMethod);
+    }
+    if (result.payment?.customerName) {
+      setCustomerName(result.payment.customerName);
+    }
+
+    if (missingPriceItemName) {
+      showToast(
+        `✨ ${result.items.length} barang masuk! Barang "${missingPriceItemName}" belum ada harga, mohon isi harga.`,
+        'info'
+      );
+      focusInput(priceInputRef);
+    } else {
+      showToast(
+        `✨ Ajaib! ${result.items.length} barang (${totalQty} unit) berhasil digenerate oleh AI ke struk`,
+        'success'
+      );
+    }
+  };
+
   const handleOpenPaymentModal = () => {
     if (cartItems.length === 0) {
       showToast('Keranjang masih kosong, tambahkan barang terlebih dahulu', 'info');
@@ -627,7 +729,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
                 <ShoppingCart size={20} color="#2563eb" /> Kasir
               </h2>
               <div className="shortcut-tip hide-on-mobile">
-                <Keyboard size={14} /> <kbd>Enter</kbd> Tambah &bull; <kbd>F2</kbd> Bayar &bull; <kbd>F3</kbd> Cetak &bull; <kbd>F4</kbd> Reset
+                <Keyboard size={14} /> <kbd>Enter</kbd> Tambah &bull; <kbd>F2</kbd> Bayar &bull; <kbd>F3</kbd> Cetak &bull; <kbd>F4</kbd> Reset &bull; <kbd>F8</kbd> AI Suara
               </div>
             </div>
 
@@ -996,6 +1098,14 @@ export const KasirView: React.FC<KasirViewProps> = ({
           setNegoTargetItem(null);
         }}
         onApplyNego={handleApplyNego}
+      />
+
+      {/* Floating Action Button (FAB) AI Suara Kasir Otomatis */}
+      <VoiceAiButton
+        products={getProducts()}
+        onResult={handleVoiceAiResult}
+        showToast={showToast}
+        isActive={isActive}
       />
     </>
   );

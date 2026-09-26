@@ -41,7 +41,18 @@ import {
   User,
   Edit2,
   Lock,
+  Sparkles,
+  Mic,
+  Key,
+  ExternalLink,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import {
+  getGeminiApiKey,
+  setGeminiApiKey,
+  testGeminiConnection,
+} from '../services/voiceAiService';
 
 interface SettingsViewProps {
   storeProfile: StoreProfile;
@@ -92,6 +103,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const loggedUser = getCurrentUser();
   const tursoConfig = getTursoConfig();
+
+  // State untuk Integrasi Google Gemini AI (Voice Kasir Ajaib)
+  const [geminiKeyInput, setGeminiKeyInput] = useState<string>(() => getGeminiApiKey());
+  const [isTestingGemini, setIsTestingGemini] = useState<boolean>(false);
+  const [geminiTestResult, setGeminiTestResult] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [showGeminiKey, setShowGeminiKey] = useState<boolean>(false);
+
+  const handleSaveGeminiKey = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setGeminiApiKey(geminiKeyInput.trim());
+    showToast('Kunci API Gemini berhasil disimpan!', 'success');
+  };
+
+  const handleTestGeminiKey = async () => {
+    setIsTestingGemini(true);
+    setGeminiTestResult(null);
+    try {
+      const res = await testGeminiConnection(geminiKeyInput.trim());
+      setGeminiTestResult(res);
+      if (res.success) {
+        showToast('Koneksi ke Google Gemini AI berhasil!', 'success');
+      } else {
+        showToast(res.message, 'info');
+      }
+    } catch (err: any) {
+      setGeminiTestResult({
+        success: false,
+        message: err.message || 'Koneksi gagal',
+      });
+    } finally {
+      setIsTestingGemini(false);
+    }
+  };
 
   // Tandai form kotor agar sync background tidak menimpa ketikan user.
   const [isProfileDirty, setIsProfileDirty] = useState(false);
@@ -823,6 +867,149 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* KARTU PENGATURAN GOOGLE GEMINI AI UNTUK VOICE KASIR */}
+      <div className="settings-card" style={{ marginTop: '1.5rem', border: '1px solid rgba(124, 58, 237, 0.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #7c3aed, #ec4899)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                boxShadow: '0 4px 12px rgba(124, 58, 237, 0.35)',
+              }}
+            >
+              <Sparkles size={20} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+                AI Suara & Pembuat Struk Otomatis (Google Gemini)
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '2px 0 0 0' }}>
+                Memungkinkan kasir generate struk hanya dengan berbicara bebas via microphone (Tombol Floating AI / Shortcut F8).
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {geminiKeyInput ? (
+              <span style={{ fontSize: '0.76rem', background: '#ecfdf5', color: '#059669', padding: '4px 10px', borderRadius: '999px', fontWeight: 700, border: '1px solid #a7f3d0' }}>
+                ✓ API Key Tersedia
+              </span>
+            ) : (
+              <span style={{ fontSize: '0.76rem', background: '#fffbeb', color: '#d97706', padding: '4px 10px', borderRadius: '999px', fontWeight: 700, border: '1px solid #fde68a' }}>
+                Mode Offline / Belum Diatur
+              </span>
+            )}
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveGeminiKey} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+              <span>Google Gemini API Key</span>
+              <a
+                href="https://aistudio.google.com/"
+                target="_blank"
+                rel="noreferrer"
+                style={{ fontSize: '0.76rem', color: '#7c3aed', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                Dapatkan API Key Gratis di Google AI Studio <ExternalLink size={12} />
+              </a>
+            </label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                <input
+                  type={showGeminiKey ? 'text' : 'password'}
+                  className="form-input"
+                  value={geminiKeyInput}
+                  onChange={(e) => setGeminiKeyInput(e.target.value)}
+                  placeholder="AIzaSy... (atau atur via VITE_GEMINI_API_KEY di file .env)"
+                  style={{ width: '100%', paddingRight: '40px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowGeminiKey(!showGeminiKey)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748b',
+                    cursor: 'pointer',
+                  }}
+                  title={showGeminiKey ? 'Sembunyikan' : 'Tampilkan'}
+                >
+                  {showGeminiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                className="btn-primary"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', whiteSpace: 'nowrap' }}
+              >
+                <Save size={15} /> Simpan
+              </button>
+
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={handleTestGeminiKey}
+                disabled={isTestingGemini || !geminiKeyInput.trim()}
+                style={{ whiteSpace: 'nowrap', borderColor: '#7c3aed', color: '#7c3aed' }}
+              >
+                {isTestingGemini ? (
+                  <>
+                    <RefreshCw size={14} className="spin-animation" /> Menguji...
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} /> Tes Koneksi
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {geminiTestResult && (
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: geminiTestResult.success ? '#ecfdf5' : '#fef2f2',
+                color: geminiTestResult.success ? '#065f46' : '#991b1b',
+                border: `1px solid ${geminiTestResult.success ? '#a7f3d0' : '#fecaca'}`,
+              }}
+            >
+              {geminiTestResult.success ? (
+                <CheckCircle size={16} color="#10b981" />
+              ) : (
+                <AlertCircle size={16} color="#ef4444" />
+              )}
+              <span>{geminiTestResult.message}</span>
+            </div>
+          )}
+
+          <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px dashed #cbd5e1', fontSize: '0.78rem', color: '#475569', lineHeight: 1.4 }}>
+            💡 <strong>Cara Penggunaan:</strong> Masuk ke halaman <strong>Kasir</strong>, klik tombol melayang <strong>AI Suara</strong> di pojok kanan bawah (atau tekan tombol <kbd>F8</kbd>), lalu sebutkan belanjaan seperti:
+            <br />
+            <em>"Pipa rucika setengah dua lonjor, baut 10 tiga biji, semen gresik lima sak, bayar tunai seratus ribu."</em>
+          </div>
+        </form>
       </div>
 
       <div className="turso-settings-card" style={{ marginTop: '1.5rem' }}>

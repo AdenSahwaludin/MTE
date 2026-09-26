@@ -13,6 +13,8 @@ export default defineConfig(({ mode }) => {
       'process.env.TURSO_AUTH_TOKEN': JSON.stringify(env.TOKEN_TURSO || env.VITE_TURSO_AUTH_TOKEN || ''),
       'import.meta.env.VITE_TURSO_DATABASE_URL': JSON.stringify(env.DATABASE_URL || env.VITE_TURSO_DATABASE_URL || ''),
       'import.meta.env.VITE_TURSO_AUTH_TOKEN': JSON.stringify(env.TOKEN_TURSO || env.VITE_TURSO_AUTH_TOKEN || ''),
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY || env.GOOGLE_API_KEY || ''),
+      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY || env.GOOGLE_API_KEY || ''),
     },
     plugins: [
       react(),

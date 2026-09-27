@@ -8,6 +8,7 @@ import {
   printNativeDirect,
 } from '../services/nativePrintService';
 import { formatRupiah, formatDateIndo } from '../utils/formatters';
+import { exportTransactionsToExcel } from '../services/excelService';
 import {
   History,
   Trash2,
@@ -19,6 +20,7 @@ import {
   ChevronUp,
   Share2,
   Bluetooth,
+  Download,
 } from 'lucide-react';
 
 interface HistoryViewProps {
@@ -104,6 +106,28 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
             <History size={22} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '8px' }} color="#2563eb" />
             Riwayat Transaksi
           </h2>
+        </div>
+
+        <div className="page-actions">
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={() => {
+              if (transactions.length === 0) {
+                showToast('Belum ada riwayat transaksi untuk diekspor', 'info');
+                return;
+              }
+              try {
+                exportTransactionsToExcel(transactions);
+                showToast(`Berhasil mengekspor ${transactions.length} transaksi ke file Excel (.xlsx)`, 'success');
+              } catch (err: any) {
+                showToast(`Gagal ekspor transaksi: ${err.message || 'Error'}`, 'info');
+              }
+            }}
+            title="Ekspor seluruh riwayat transaksi ke file Excel (.xlsx)"
+          >
+            <Download size={15} /> Export Excel
+          </button>
         </div>
       </div>
 

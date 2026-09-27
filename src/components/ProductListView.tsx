@@ -1,6 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { Product } from '../types';
-import { deleteProduct, exportDataJSON, importDataJSON } from '../services/storageService';
+import { deleteProduct, importDataJSON } from '../services/storageService';
+import {
+  exportProductsToExcel,
+  importProductsFromExcel,
+  downloadProductExcelTemplate,
+} from '../services/excelService';
 import { formatRupiah } from '../utils/formatters';
 import { ProductModal } from './ProductModal';
 import { ProductDetailModal } from './ProductDetailModal';
@@ -15,6 +20,7 @@ import {
   Upload,
   Layers,
   Tag,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface ProductListViewProps {
@@ -34,6 +40,7 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
 
   // Extract unique categories from actual products in DB
   const categories = useMemo(() => {
@@ -91,40 +98,65 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
     }
   };
 
-  // Export JSON
+  // Export Excel (.xlsx)
   const handleExport = () => {
-    const jsonStr = exportDataJSON();
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `backup_produk_mega_teknik_${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('Data produk & transaksi berhasil diekspor ke file JSON', 'success');
+    if (products.length === 0) {
+      showToast('Belum ada data produk untuk diekspor', 'info');
+      return;
+    }
+    try {
+      exportProductsToExcel(products);
+      showToast(`Berhasil mengekspor ${products.length} produk ke file Excel (.xlsx)`, 'success');
+    } catch (err: any) {
+      showToast(`Gagal mengekspor Excel: ${err.message || 'Error'}`, 'info');
+    }
   };
 
-  // Import JSON
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Import Excel (.xlsx, .xls, .csv) & JSON fallback
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        const success = importDataJSON(content);
-        if (success) {
-          onRefresh();
-          showToast('Data berhasil diimpor dari file JSON!', 'success');
-        } else {
-          showToast('Gagal membaca format file JSON', 'info');
+    const fileName = file.name.toLowerCase();
+
+    // Fallback file JSON
+    if (fileName.endsWith('.json')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        if (content) {
+          const success = importDataJSON(content);
+          if (success) {
+            onRefresh();
+            showToast('Data produk berhasil diimpor dari file JSON!', 'success');
+          } else {
+            showToast('Gagal membaca format file JSON', 'info');
+          }
         }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+      return;
+    }
+
+    // Format Excel (.xlsx, .xls, .csv)
+    setIsImporting(true);
+    showToast('Sedang membaca dan mengimpor file Excel...', 'info');
+
+    try {
+      const result = await importProductsFromExcel(file);
+      if (result.success) {
+        onRefresh();
+        showToast(result.message, 'success');
+      } else {
+        showToast(result.message || 'Gagal mengimpor data produk dari Excel', 'info');
       }
-    };
-    reader.readAsText(file);
-    // Reset file input
-    e.target.value = '';
+    } catch (err: any) {
+      showToast(`Gagal mengimpor file: ${err.message || 'Format tidak didukung'}`, 'info');
+    } finally {
+      setIsImporting(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -139,18 +171,38 @@ export const ProductListView: React.FC<ProductListViewProps> = ({
         </div>
 
         <div className="page-actions">
-          <label className="btn-outline" style={{ cursor: 'pointer', margin: 0 }}>
-            <Upload size={15} /> Import
+          <label className="btn-outline" style={{ cursor: isImporting ? 'wait' : 'pointer', margin: 0 }} title="Import produk dari file Excel (.xlsx, .xls, .csv)">
+            <Upload size={15} /> {isImporting ? 'Mengimpor...' : 'Import'}
             <input
               type="file"
-              accept=".json"
+              accept=".xlsx,.xls,.csv,.json"
               style={{ display: 'none' }}
               onChange={handleImport}
+              disabled={isImporting}
             />
           </label>
-          <button type="button" className="btn-outline" onClick={handleExport}>
+
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={handleExport}
+            title="Ekspor seluruh daftar produk ke file Excel (.xlsx)"
+          >
             <Download size={15} /> Export
           </button>
+
+          <button
+            type="button"
+            className="btn-outline"
+            onClick={() => {
+              downloadProductExcelTemplate();
+              showToast('Template Excel produk berhasil diunduh', 'success');
+            }}
+            title="Unduh format template Excel untuk import produk massal"
+          >
+            <FileSpreadsheet size={15} /> Template
+          </button>
+
           <button type="button" className="btn-primary" onClick={handleOpenAddModal}>
             <Plus size={16} /> Tambah
           </button>

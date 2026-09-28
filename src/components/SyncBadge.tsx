@@ -42,26 +42,30 @@ export const SyncBadge: React.FC<SyncBadgeProps> = ({
   let badgeBg = 'rgba(16, 185, 129, 0.15)';
   let badgeBorder = 'rgba(16, 185, 129, 0.3)';
   let icon = <CheckCircle2 size={13} color="#10b981" />;
-  let labelText = 'Turso Cloud';
+  let labelText = 'Online';
+  let actionText = '• Perbarui';
 
   if (!syncInfo.isOnline || syncInfo.status === 'offline') {
     badgeColor = '#94a3b8';
     badgeBg = 'rgba(148, 163, 184, 0.15)';
     badgeBorder = 'rgba(148, 163, 184, 0.3)';
     icon = <CloudOff size={13} color="#94a3b8" />;
-    labelText = 'Offline (Lokal)';
+    labelText = 'Offline';
+    actionText = '';
   } else if (isSyncing) {
     badgeColor = '#38bdf8';
     badgeBg = 'rgba(56, 189, 248, 0.15)';
     badgeBorder = 'rgba(56, 189, 248, 0.3)';
     icon = <RefreshCw size={13} className="spin-animation" color="#38bdf8" />;
-    labelText = 'Menyinkronkan...';
+    labelText = 'Mengirim data...';
+    actionText = '';
   } else if (syncInfo.status === 'error') {
     badgeColor = '#f87171';
     badgeBg = 'rgba(248, 113, 113, 0.15)';
     badgeBorder = 'rgba(248, 113, 113, 0.3)';
     icon = <AlertCircle size={13} color="#f87171" />;
-    labelText = syncInfo.pendingCount > 0 ? `${syncInfo.pendingCount} Tertunda` : 'Perlu Sync';
+    labelText = syncInfo.pendingCount > 0 ? `${syncInfo.pendingCount} belum terkirim` : 'Gagal, coba lagi';
+    actionText = '• Coba lagi';
   }
 
   return (
@@ -69,9 +73,15 @@ export const SyncBadge: React.FC<SyncBadgeProps> = ({
       className={`turso-sync-badge ${compact ? 'compact' : ''} ${isSyncing ? 'syncing' : ''}`}
       onClick={handleManualSync}
       title={
-        syncInfo.lastSyncedAt
-          ? `Terakhir sinkron: ${new Date(syncInfo.lastSyncedAt).toLocaleTimeString('id-ID')}. Klik untuk sinkronkan sekarang.`
-          : 'Klik untuk sinkronisasi dengan Turso Cloud'
+        isSyncing
+          ? 'Sedang mengirim data ke penyimpanan online...'
+          : syncInfo.status === 'error'
+          ? 'Ada data yang belum terkirim. Klik untuk coba kirim lagi.'
+          : !syncInfo.isOnline || syncInfo.status === 'offline'
+          ? 'Tidak ada internet. Data tersimpan di perangkat ini dan akan terkirim otomatis saat online.'
+          : syncInfo.lastSyncedAt
+          ? `Data aman. Terakhir dikirim: ${new Date(syncInfo.lastSyncedAt).toLocaleTimeString('id-ID')}. Klik untuk perbarui sekarang.`
+          : 'Data tersimpan aman. Klik untuk perbarui sekarang.'
       }
       style={{
         display: 'inline-flex',
@@ -107,9 +117,9 @@ export const SyncBadge: React.FC<SyncBadgeProps> = ({
           {syncInfo.pendingCount}
         </span>
       )}
-      {showButton && !compact && !isSyncing && (
+      {showButton && !compact && !isSyncing && actionText && (
         <span className="sync-badge-dot" style={{ opacity: 0.7, fontSize: '10px', marginLeft: '2px' }}>
-          • Sync
+          {actionText}
         </span>
       )}
     </div>

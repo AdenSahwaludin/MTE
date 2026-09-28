@@ -722,19 +722,24 @@ export const KasirView: React.FC<KasirViewProps> = ({
     let updatedCart = [...cartItems];
     let totalQty = 0;
     let missingPriceItemName: string | null = null;
+    let missingPriceCartId: string | null = null;
+    const liveCatalog = getProducts();
+    const liveIds = new Set(liveCatalog.map((p) => p.id));
 
     for (const item of result.items) {
-      totalQty += item.qty;
+      const safeQty = Math.min(Math.max(1, Math.floor(item.qty) || 1), 10000);
+      totalQty += safeQty;
 
-      // Resolusi pintar: Jika belum ada matchedProductId, cocokkan ke katalog produk toko
-      let resolvedId = item.matchedProductId;
-      let resolvedName = item.name;
-      let resolvedPrice = item.price;
-      let resolvedUnit = item.unit || 'Pcs';
+      // Resolusi pintar: Jika belum ada matchedProductId, cocokkan ke katalog produk toko.
+      // Validasi ID dari AI (cegah halusinasi): harus ada di katalog, kalau tidak -> anggap null.
+      let resolvedId = item.matchedProductId && liveIds.has(item.matchedProductId) ? item.matchedProductId : undefined;
+      let resolvedName = (item.name || 'Barang').trim().slice(0, 80);
+      let resolvedPrice = Math.max(0, Math.floor(item.price) || 0);
+      let resolvedUnit = (item.unit || 'Pcs').trim().slice(0, 12) || 'Pcs';
       let resolvedIsNew = item.isNew;
 
       if (!resolvedId) {
-        const matches = searchProducts(item.name);
+        const matches = searchProducts(resolvedName);
         if (matches.length > 0) {
           const matched = matches[0].product;
           resolvedId = matched.id;
@@ -742,8 +747,48 @@ export const KasirView: React.FC<KasirViewProps> = ({
           if (resolvedPrice <= 0) {
             resolvedPrice = matched.price;
           }
-          resolvedUnit = matched.unit || 'Pcs';
+          // Hormati satuan ucapan jika eksplisit (bukan default Pcs), else pakai katalog
+          if (!resolvedUnit || resolvedUnit.toLowerCase() === 'pcs') {
+            resolvedUnit = matched.unit || 'Pcs';
+          }
           resolvedIsNew = false;
+        }
+      } else {
+        // ID valid dari AI: ambil nama resmi + harga katalog sebagai fallback
+        const catalogItem = liveCatalog.find((p) => p.id === resolvedId);
+        if (catalogItem) {
+          resolvedName = catalogItem.name;
+          if (resolvedPrice <= 0) resolvedPrice = catalogItem.price;
+          if (!resolvedUnit || resolvedUnit.toLowerCase() === 'pcs') {
+            resolvedUnit = catalogItem.unit || resolvedUnit;
+          }
+          resolvedIsNew = false;
+        } else {
+          resolvedId = undefined;
+        }
+      }
+
+      // Auto-save beneran ke Master Produk (sebelumnya badge "Auto-Saved" berbohong, tidak pernah disimpan).
+      // Hanya jika: produk baru + ada harga valid + autoSave aktif.
+      if (!resolvedId && resolvedIsNew && resolvedPrice > 0 && storeProfile.autoSaveProducts) {
+        try {
+          const activeUser = getCurrentUser();
+          const saved = addOrUpdateProduct(
+            resolvedName,
+            resolvedPrice,
+            [],
+            resolvedUnit || 'Pcs',
+            '',
+            undefined,
+            activeUser?.name || 'Kasir (Suara AI)'
+          );
+          resolvedId = saved.product.id;
+          resolvedName = saved.product.name;
+          resolvedUnit = saved.product.unit || resolvedUnit;
+          liveIds.add(resolvedId);
+          onProductUpdated();
+        } catch {
+          // Gagal simpan (mis. quota) -> tetap masuk keranjang sebagai item baru
         }
       }
 
@@ -755,8 +800,9 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
       if (existingIndex !== -1) {
         const existing = updatedCart[existingIndex];
-        const newQty = existing.qty + item.qty;
-        const price = resolvedPrice > 0 ? resolvedPrice : existing.price;
+        const newQty = existing.qty + safeQty;
+        // Jangan timpa harga nego yang sudah ada dengan harga katalog/ucapan
+        const price = existing.isNego ? existing.price : resolvedPrice > 0 ? resolvedPrice : existing.price;
         updatedCart[existingIndex] = {
           ...existing,
           qty: newQty,
@@ -771,14 +817,15 @@ export const KasirView: React.FC<KasirViewProps> = ({
           price: resolvedPrice,
           originalPrice: resolvedPrice,
           isNego: false,
-          qty: item.qty,
+          qty: safeQty,
           unit: resolvedUnit,
-          subtotal: resolvedPrice * item.qty,
+          subtotal: resolvedPrice * safeQty,
           isNewProduct: resolvedIsNew,
         };
         updatedCart.push(newItem);
         if (resolvedPrice <= 0 && !missingPriceItemName) {
           missingPriceItemName = resolvedName;
+          missingPriceCartId = newItem.id;
         }
       }
     }
@@ -798,10 +845,17 @@ export const KasirView: React.FC<KasirViewProps> = ({
 
     if (missingPriceItemName) {
       showToast(
-        `✨ ${result.items.length} barang masuk! Barang "${missingPriceItemName}" belum ada harga, mohon isi harga.`,
+        `✨ ${result.items.length} barang masuk! Barang "${missingPriceItemName}" belum ada harga — silakan isi harga jualnya.`,
         'info'
       );
-      focusInput(priceInputRef);
+      // Buka modal Nego/Harga untuk item yang harganya 0 (lebih tepat daripada fokus ke input manual atas)
+      const target = updatedCart.find((c) => c.id === missingPriceCartId);
+      if (target) {
+        setNegoTargetItem(target);
+        setIsNegoModalOpen(true);
+      } else {
+        focusInput(priceInputRef);
+      }
     } else {
       showToast(
         `✨ Ajaib! ${result.items.length} barang (${totalQty} unit) berhasil masuk ke struk`,

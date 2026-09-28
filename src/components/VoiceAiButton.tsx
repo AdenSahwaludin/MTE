@@ -65,6 +65,9 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
   const spokenTextRef = useRef<string>('');
   const isManuallyStoppedRef = useRef<boolean>(false);
   const closeTimerRef = useRef<any>(null);
+  // Guard anti double-process (state async, jadi pakai ref sinkron)
+  const isProcessingRef = useRef<boolean>(false);
+  const lastProcessedRef = useRef<string>('');
 
   // Audio Context & Analyser refs untuk level meter
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -85,11 +88,16 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
     }
   };
 
-  // Mulai Audio Level Meter dari mic
+  // Mulai Audio Level Meter dari mic — OPSIONAL, jangan ganggu SpeechRecognition.
+  // Jika gagal (permission dipakai STT / browser sibuk), diam-diam skip agar mic utama tetap jalan.
   const startAudioMeter = async () => {
+    // Bersihkan meter lama dulu agar tidak bocor saat start/stop cepat (PTT)
+    stopAudioMeter();
     try {
       if (!navigator.mediaDevices?.getUserMedia) return;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
       micStreamRef.current = stream;
 
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -154,9 +162,16 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
     if (!isActive) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Abaikan jika user sedang mengetik di input form atau modal lain
-      const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      const isInput = targetTag === 'input' || targetTag === 'textarea' || (e.target as HTMLElement)?.isContentEditable;
+      // Abaikan jika user sedang mengetik di input form atau modal lain.
+      // Termasuk BUTTON: Space di tombol fokus memicu click -> harus diabaikan agar PTT tidak double.
+      const el = e.target as HTMLElement | null;
+      const targetTag = el?.tagName?.toLowerCase();
+      const isInput =
+        targetTag === 'input' ||
+        targetTag === 'textarea' ||
+        targetTag === 'select' ||
+        targetTag === 'button' ||
+        (el as any)?.isContentEditable;
 
       if (e.key === 'F8') {
         e.preventDefault();
@@ -224,6 +239,8 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
   }, []);
 
   const startListening = () => {
+    // Guard: jangan start ganda (PTT pointer + keyboard bisa barengan)
+    if (isListening || isProcessingRef.current) return;
     if (!isSupported) {
       setIsCardOpen(true);
       setErrorMessage('Browser ini belum mendukung Web Speech API. Anda dapat mengetik perintah langsung di kotak bawah.');
@@ -244,6 +261,10 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
 
     try {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      // Hentikan sesi lama dulu agar tidak tumpuk (PTT cepat)
+      try {
+        recognitionRef.current?.abort?.();
+      } catch {}
       const recognition = new SpeechRecognition();
 
       recognition.lang = 'id-ID';
@@ -255,7 +276,8 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
         setIsListening(true);
         setIsCardOpen(true);
         playMagicChime('start');
-        startAudioMeter();
+        // Meter opsional, jangan blokir mic utama
+        void startAudioMeter();
       };
 
       recognition.onresult = (event: any) => {
@@ -292,10 +314,11 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
       recognition.onend = () => {
         setIsListening(false);
         stopAudioMeter();
-        const fullText = (spokenTextRef.current || transcript || interimText).trim();
-        // Jika kasir sudah bicara dan selesai, otomatis proses
-        if (fullText && !isProcessing && !isManuallyStoppedRef.current) {
-          processTranscript(fullText);
+        // Pakai ref (bukan state closure yang basi) agar teks tidak hilang
+        const fullText = (spokenTextRef.current || '').trim();
+        // Jika kasir sudah bicara dan selesai, otomatis proses. Minimal 2 char agar batuk tidak diproses.
+        if (fullText.length >= 2 && !isProcessingRef.current && !isManuallyStoppedRef.current) {
+          void processTranscript(fullText);
         }
       };
 
@@ -310,6 +333,13 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
   };
 
   const stopListening = () => {
+    if (!isListening && !spokenTextRef.current) {
+      // Tidak ada sesi & tidak ada teks -> jangan proses kosong
+      if (!transcript && !interimText) {
+        setErrorMessage('Belum ada ucapan yang tertangkap. Anda bisa coba bicara lagi atau ketik di kotak teks bawah.');
+        return;
+      }
+    }
     isManuallyStoppedRef.current = true;
     stopAudioMeter();
     if (recognitionRef.current) {
@@ -318,9 +348,9 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
       } catch {}
     }
     setIsListening(false);
-    const fullText = (spokenTextRef.current || transcript || interimText).trim();
-    if (fullText) {
-      processTranscript(fullText);
+    const fullText = (spokenTextRef.current || `${transcript} ${interimText}` || '').trim();
+    if (fullText.length >= 2) {
+      void processTranscript(fullText);
     } else {
       setErrorMessage('Belum ada ucapan yang tertangkap. Anda bisa coba bicara lagi atau ketik di kotak teks bawah.');
     }
@@ -336,19 +366,30 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
     }
     setIsListening(false);
     setIsProcessing(false);
+    isProcessingRef.current = false;
     setIsCardOpen(false);
     setTranscript('');
     setInterimText('');
+    spokenTextRef.current = '';
     setErrorMessage(null);
   };
 
   const processTranscript = async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) {
+    if (!trimmed || trimmed.length < 2) {
       setErrorMessage('Belum ada ucapan yang tertangkap. Silakan tekan mic dan sebutkan perintah.');
       return;
     }
+    // Cegah double-process (onend + stop manual + manual submit bisa barengan)
+    if (isProcessingRef.current) return;
+    if (lastProcessedRef.current === trimmed) return;
+    lastProcessedRef.current = trimmed;
+    // Reset dedup setelah 3 detik agar ucapan sama bisa diulang
+    setTimeout(() => {
+      if (lastProcessedRef.current === trimmed) lastProcessedRef.current = '';
+    }, 3000);
 
+    isProcessingRef.current = true;
     setIsProcessing(true);
     setErrorMessage(null);
 
@@ -370,6 +411,7 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
       if (result.success && hasActionData) {
         playMagicChime('success');
         setLastSummary(result.summary);
+        spokenTextRef.current = '';
         onResult(result);
 
         // Auto close setelah 1.2 detik agar kasir sempat melihat feedback visual tanpa menunggu lama
@@ -389,17 +431,19 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
       playMagicChime('error');
       setErrorMessage('Gagal memproses suara: ' + (err.message || 'Periksa koneksi'));
     } finally {
+      isProcessingRef.current = false;
       setIsProcessing(false);
     }
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualInput.trim()) return;
+    if (!manualInput.trim() || isProcessingRef.current) return;
     const text = manualInput.trim();
     setManualInput('');
     setTranscript(text);
-    processTranscript(text);
+    spokenTextRef.current = text;
+    void processTranscript(text);
   };
 
   const currentDisplay = transcript + (interimText ? (transcript ? ' ' : '') + interimText : '');
@@ -414,6 +458,9 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
           id="btn-voice-ai-fab"
           className={`voice-fab-btn ${isListening ? 'listening' : ''} ${isProcessing ? 'processing' : ''}`}
           onClick={() => {
+            // Di mode PTT, klik (tanpa tahan) hanya buka dialog — proses bicara via tahan.
+            // Guard ref agar tidak double dengan pointer handlers.
+            if (isProcessingRef.current) return;
             if (pttMode === 'ptt') {
               // Jika di mode PTT dan card belum buka, buka dialog
               if (!isCardOpen) {
@@ -429,8 +476,11 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
               }
             }
           }}
-          onPointerDown={() => {
-            if (pttMode === 'ptt' && !isListening && !isProcessing) {
+          onPointerDown={(e) => {
+            // Hanya untuk sentuh/mouse di mode PTT. Abaikan klik kanan / tombol non-kiri.
+            if (pttMode !== 'ptt') return;
+            if (e.pointerType === 'mouse' && (e as any).button !== 0) return;
+            if (!isListening && !isProcessingRef.current) {
               startListening();
             }
           }}
@@ -438,6 +488,16 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
             if (pttMode === 'ptt' && isListening) {
               stopListening();
             }
+          }}
+          onPointerCancel={() => {
+            // Lepas di luar tombol / gesture dibatalkan = hentikan agar mic tidak nyangkut
+            if (pttMode === 'ptt' && isListening) {
+              stopListening();
+            }
+          }}
+          onContextMenu={(e) => {
+            // Tahan lama di HP memicu context menu — cegah agar PTT tidak terputus
+            if (pttMode === 'ptt') e.preventDefault();
           }}
           title={
             isProcessing
@@ -606,9 +666,17 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
                   <button
                     type="button"
                     className={`voice-ptt-hold-btn ${isListening ? 'holding' : ''}`}
-                    onPointerDown={startListening}
-                    onPointerUp={stopListening}
+                    onPointerDown={(e) => {
+                      if ((e as any).button !== undefined && (e as any).button !== 0 && e.pointerType === 'mouse') return;
+                      e.preventDefault();
+                      startListening();
+                    }}
+                    onPointerUp={(e) => {
+                      e.preventDefault();
+                      stopListening();
+                    }}
                     onPointerCancel={stopListening}
+                    onContextMenu={(e) => e.preventDefault()}
                   >
                     <Mic size={18} />
                     {isListening ? 'Lepas untuk Selesai' : 'Tekan & Tahan untuk Bicara'}

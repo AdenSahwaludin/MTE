@@ -394,7 +394,25 @@ const parseTranscriptLocally = (transcript: string, products: Product[]): VoiceA
     };
   }
 
-  // 5. Deteksi FINALIZE_PAYMENT / OPEN_PAYMENT
+  // 5. Deteksi APPLY_DISCOUNT (Nego / Diskon Cepat)
+  const discountMatch = lower.match(/(?:beri|kasih|dapat|ada)?\s*(?:diskon|potongan|potong)\s*(?:harga)?\s*(\d+(?:[.,]\d+)?)\s*(?:ribu|rb|k)?(?:\s*(?:buat|untuk|pada|di)?\s*(.+))?/i);
+  if (discountMatch) {
+    let val = parseFloat(discountMatch[1].replace(/[.,]/g, ''));
+    if (val < 1000 || lower.includes('ribu') || lower.includes('rb')) val *= 1000;
+    const targetItem = (discountMatch[2] || '').trim();
+    return {
+      success: true,
+      rawTranscript: transcript,
+      action: 'APPLY_DISCOUNT',
+      summary: `Diskon Rp ${val.toLocaleString('id-ID')}${targetItem ? ` untuk ${targetItem}` : ''}`,
+      items: [],
+      discountAmount: val,
+      discountTargetItemName: targetItem || undefined,
+      isOfflineFallback: true,
+    };
+  }
+
+  // 6. Deteksi FINALIZE_PAYMENT / OPEN_PAYMENT
   if (/(?:uang\s*pas|bayar\s*lunas|bayar\s*uang\s*pas)/i.test(lower)) {
     return {
       success: true,
@@ -418,7 +436,7 @@ const parseTranscriptLocally = (transcript: string, products: Product[]): VoiceA
     };
   }
 
-  // 6. DEFAULT: ADD_ITEMS (Tambah Barang ke Keranjang)
+  // 7. DEFAULT: ADD_ITEMS (Tambah Barang ke Keranjang)
   // Split ucapan menjadi per item (kata sambung umum atau angka pemisah)
   const segments = lower
     .split(/,|\.|\bdan\b|\bsama\b|\bterus\b|\blalu\b|\btambah\b|\bjuga\b/i)
@@ -554,15 +572,22 @@ export const processVoiceTranscriptWithGemini = async (
     };
   }
 
-  // Jika tanpa API key, jalankan local matcher
+  // 1. EVALUASI LOKAL INSTAN (< 2 milidetik)
+  // Jika ucapan kasir adalah perintah operasional kasir (Hapus, Kosongkan, Diskon, Cek Stok, Bayar),
+  // langsung eksekusi instan tanpa menunggu request cloud!
+  const localResult = parseTranscriptLocally(transcript, products);
+  if (localResult.action !== 'ADD_ITEMS') {
+    return localResult;
+  }
+
+  // Jika tanpa API key, langsung gunakan pencocokan lokal
   if (!apiKey) {
-    const localResult = parseTranscriptLocally(transcript, products);
     localResult.error = 'API Key Gemini belum disetel. Menggunakan pencocokan cerdas lokal.';
     return localResult;
   }
 
-  // Nomor 1: Pre-Filtering Kandidat Produk (Hemat token & percepat inferensi)
-  const candidateProducts = filterCandidateProducts(transcript, products, 40);
+  // 2. Pre-Filtering Kandidat Produk untuk Gemini Cloud
+  const candidateProducts = filterCandidateProducts(transcript, products, 35);
   const catalogSummary = candidateProducts.map((p) => ({
     id: p.id,
     name: p.name,
@@ -572,45 +597,17 @@ export const processVoiceTranscriptWithGemini = async (
     category: p.category || '',
   }));
 
-  const systemInstruction = `Kamu adalah asisten kasir AI cerdas untuk toko teknik & elektronik "Mega Tehnik Elektronik".
-Tugasmu adalah menganalisis ucapan kasir/pelanggan bahasa Indonesia (termasuk percakapan santai, slang teknik, atau istilah daerah), lalu mengidentifikasi AKSI KASIR (action) serta mengekstrak rincian barang, jumlah, harga, atau pembayaran.
-
-PAKET PERINTAH KASIR YANG DIDUKUNG (PILIH SALAH SATU DI 'action'):
-1. "ADD_ITEMS" (Beli / Tambah Barang ke Keranjang - DEFAULT):
-   - Contoh: "Pipa rucika setengah dim 2 batang sama lem alteco satu", "Baut baja ringan 50 biji", "Dinamo kipas bearing harganya 45 ribu bayar gocap".
-   - Aturan: Pisahkan nama barang dari nominal harga! Masukkan nominal ke 'price'.
-   - Jika barang cocok dengan katalog, gunakan matchedProductId dan nama resmi dari katalog, isNew: false.
-   - Jika tidak ada di katalog, isNew: true.
-2. "REMOVE_ITEM" (Hapus / Batalkan Barang dari Keranjang):
-   - Contoh: "Hapus pipa rucika", "Batalin lem alteco", "Kurangi baut 5 biji", "Hapus barang terakhir".
-   - Isi properti 'removeTarget': { "name": "nama barang", "qty": 1, "lastItem": true/false }.
-3. "CLEAR_CART" (Kosongkan Semua Keranjang):
-   - Contoh: "Kosongkan keranjang", "Hapus semua barang", "Batalin semua belanjaan", "Reset keranjang".
-4. "APPLY_DISCOUNT" (Diskon / Nego Harga):
-   - Contoh: "Beri diskon 5 ribu", "Potongan 10000", "Nego bearing jadi 40 ribu".
-   - Isi 'discountAmount': 5000, 'discountTargetItemName': "nama barang atau kosong".
-5. "CHECK_STOCK" (Tanya Harga / Cek Stok Barang):
-   - Contoh: "Cek stok kran onda 1/2", "Berapa harga dinamo kipas?", "Ada saklar broco nggak?", "Tanya harga pipa".
-   - Isi properti 'queryInfo': { "productName": "nama barang", "message": "jawaban ringkas" }.
-6. "OPEN_PAYMENT" (Buka Menu Pembayaran):
-   - Contoh: "Buka menu bayar", "Lanjut pembayaran", "Mau bayar".
-7. "FINALIZE_PAYMENT" (Bayar Uang Pas / Tunai):
-   - Contoh: "Bayar uang pas", "Bayar lunas", "Bayar tunai 100 ribu".
-   - Isi 'payment': { "cashAmount": 100000, "paymentMethod": "cash" }.
-8. "RESET_TRANSACTION" (Reset Transaksi Baru):
-   - Contoh: "Reset transaksi", "Mulai transaksi baru", "Bikin struk baru".
-
-SLANG HARGA INDONESIA:
-- "seceng" = 1000, "goceng" = 5000, "ceban" = 10000, "noban" = 20000, "gocap" = 50000, "cepek" = 100000, "setengah juta" = 500000, "sejuta" = 1000000.
-
-WAJIB MENGEMBALIKAN HANYA JSON MURNI SESUAI SCHEMA BERIKUT:
+  const systemInstruction = `Kamu adalah asisten kasir AI cerdas toko teknik "Mega Tehnik Elektronik".
+Tugas: Analisis ucapan kasir dan ekstrak barang yang dibeli (nama barang bersih tanpa kata harga, harga nominal jika kasir menyebutkan, jumlah qty, dan matchedProductId jika cocok dengan katalog).
+Slang Uang: gocap=50000, ceban=10000, noban=20000, goceng=5000, cepek=100000.
+Satuan: batang/lonjor, sak, rol, biji/buah/pcs, meter, kaleng, set.
+Output WAJIB JSON murni:
 {
-  "action": "ADD_ITEMS" | "REMOVE_ITEM" | "CLEAR_CART" | "APPLY_DISCOUNT" | "CHECK_STOCK" | "OPEN_PAYMENT" | "FINALIZE_PAYMENT" | "RESET_TRANSACTION",
-  "summary": "Ringkasan jelas aksi kasir",
+  "summary": "ringkasan singkat",
   "items": [
     {
       "matchedProductId": "string ID atau null",
-      "name": "nama resmi barang (bersih tanpa kata harga)",
+      "name": "nama resmi barang",
       "price": 0,
       "qty": 1,
       "unit": "Pcs",
@@ -621,121 +618,71 @@ WAJIB MENGEMBALIKAN HANYA JSON MURNI SESUAI SCHEMA BERIKUT:
     "cashAmount": 0,
     "paymentMethod": "cash",
     "customerName": ""
-  },
-  "removeTarget": {
-    "name": "string nama barang",
-    "qty": 1,
-    "lastItem": false
-  },
-  "discountAmount": 0,
-  "discountTargetItemName": "",
-  "queryInfo": {
-    "productName": "string nama barang",
-    "message": "ringkasan jawaban"
   }
 }
-
-Katalog Produk Toko Terpilih:
+Katalog Produk:
 ${JSON.stringify(catalogSummary)}`;
 
-  const prompt = `Ucapan Kasir:
-"${transcript}"`;
+  const prompt = `Ucapan Kasir: "${transcript}"`;
 
-  const models = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-flash-lite-latest',
-    'gemini-3.1-flash-lite',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-flash-latest',
-  ];
-  let lastError = '';
+  // Coba model tercepat dengan STRICT TIMEOUT 1.4 detik & TANPA RETRY LOOP (Bebas Stuck!)
+  const fastModels = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest'];
 
-  for (const model of models) {
-    let attempt = 0;
-    while (attempt < 2) {
-      attempt++;
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            systemInstruction: { parts: [{ text: systemInstruction }] },
-            generationConfig: {
-              temperature: 0.1,
-              responseMimeType: 'application/json',
-            },
-          }),
-        });
+  for (const model of fastModels) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1400);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          lastError = `Status ${response.status}: ${errorText}`;
-          if ((response.status === 503 || response.status === 429) && attempt < 2) {
-            await new Promise((r) => setTimeout(r, 600));
-            continue;
-          }
-          break;
-        }
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: systemInstruction }] },
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+          },
+        }),
+      });
 
-        const data = await response.json();
-        const parts = data?.candidates?.[0]?.content?.parts || [];
-        const textPart = parts.find((p: any) => typeof p.text === 'string' && p.text.trim()) || parts[0];
-        let rawText = textPart?.text || '';
+      clearTimeout(timeoutId);
 
-        if (!rawText) {
-          throw new Error('Jawaban AI kosong');
-        }
+      if (!response.ok) {
+        // Jika status 503 / 429 / 404, JANGAN DELAY RETRY! Langsung coba model berikutnya atau fallback lokal
+        continue;
+      }
 
-        if (rawText.includes('```')) {
-          rawText = rawText.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
-        }
+      const data = await response.json();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const textPart = parts.find((p: any) => typeof p.text === 'string' && p.text.trim()) || parts[0];
+      let rawText = textPart?.text || '';
 
-        const parsed = JSON.parse(rawText);
-        const action: VoiceAiActionType = [
-          'ADD_ITEMS',
-          'REMOVE_ITEM',
-          'CLEAR_CART',
-          'APPLY_DISCOUNT',
-          'CHECK_STOCK',
-          'OPEN_PAYMENT',
-          'FINALIZE_PAYMENT',
-          'RESET_TRANSACTION',
-        ].includes(parsed.action)
-          ? parsed.action
-          : 'ADD_ITEMS';
+      if (!rawText) continue;
 
-        const items: VoiceAiItem[] = Array.isArray(parsed.items)
-          ? parsed.items.map((it: any) => ({
-              matchedProductId: it.matchedProductId || undefined,
-              name: String(it.name || 'Barang').trim(),
-              price: typeof it.price === 'number' ? Math.max(0, it.price) : 0,
-              qty: typeof it.qty === 'number' ? Math.max(1, it.qty) : 1,
-              unit: String(it.unit || 'Pcs').trim(),
-              isNew: Boolean(it.isNew),
-            }))
-          : [];
+      if (rawText.includes('```')) {
+        rawText = rawText.replace(/```(?:json)?\s*([\s\S]*?)\s*```/g, '$1').trim();
+      }
 
-        // Resolusi queryInfo untuk CHECK_STOCK
-        let queryInfo = parsed.queryInfo;
-        if (action === 'CHECK_STOCK' && queryInfo?.productName) {
-          const localMatch = searchProducts(queryInfo.productName);
-          const topProduct = localMatch[0]?.product;
-          if (topProduct) {
-            queryInfo.matchedProductId = topProduct.id;
-            queryInfo.price = topProduct.price;
-            queryInfo.unit = topProduct.unit || 'Pcs';
-            queryInfo.message = `${topProduct.name} - Rp ${topProduct.price.toLocaleString('id-ID')} / ${topProduct.unit || 'Pcs'}`;
-          }
-        }
+      const parsed = JSON.parse(rawText);
+      const items: VoiceAiItem[] = Array.isArray(parsed.items)
+        ? parsed.items.map((it: any) => ({
+            matchedProductId: it.matchedProductId || undefined,
+            name: String(it.name || 'Barang').trim(),
+            price: typeof it.price === 'number' ? Math.max(0, it.price) : 0,
+            qty: typeof it.qty === 'number' ? Math.max(1, it.qty) : 1,
+            unit: String(it.unit || 'Pcs').trim(),
+            isNew: Boolean(it.isNew),
+          }))
+        : [];
 
+      if (items.length > 0) {
         return {
           success: true,
           rawTranscript: transcript,
-          action,
+          action: 'ADD_ITEMS',
           summary: parsed.summary || `${items.length} barang terdeteksi oleh AI`,
           items,
           payment: parsed.payment
@@ -750,20 +697,14 @@ ${JSON.stringify(catalogSummary)}`;
                 customerName: parsed.payment.customerName ? String(parsed.payment.customerName).trim() : undefined,
               }
             : undefined,
-          removeTarget: parsed.removeTarget,
-          discountAmount: typeof parsed.discountAmount === 'number' ? parsed.discountAmount : undefined,
-          discountTargetItemName: parsed.discountTargetItemName ? String(parsed.discountTargetItemName).trim() : undefined,
-          queryInfo,
         };
-      } catch (err: any) {
-        lastError = err.message || String(err);
       }
+    } catch {
+      // Abort / timeout atau kendala jaringan -> langsung coba berikutnya / fallback
     }
   }
 
-  // Jika API Gemini gagal, jalankan fallback parser lokal
-  console.warn('Gemini API call failed, falling back to local voice parser:', lastError);
-  const fallback = parseTranscriptLocally(transcript, products);
-  fallback.error = `AI Cloud tidak merespons (${lastError}). Menggunakan pencocokan lokal.`;
-  return fallback;
+  // Jika cloud Google sedang mengalami lonjakan beban (503) atau timeout,
+  // gunakan hasil pencocokan lokal instan tanpa jeda!
+  return localResult;
 };

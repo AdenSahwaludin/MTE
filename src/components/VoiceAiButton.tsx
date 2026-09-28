@@ -372,13 +372,13 @@ export const VoiceAiButton: React.FC<VoiceAiButtonProps> = ({
         setLastSummary(result.summary);
         onResult(result);
 
-        // Auto close setelah 2.4 detik agar kasir sempat melihat feedback visual
+        // Auto close setelah 1.2 detik agar kasir sempat melihat feedback visual tanpa menunggu lama
         closeTimerRef.current = setTimeout(() => {
           setIsCardOpen(false);
           setLastSummary(null);
           setTranscript('');
           setInterimText('');
-        }, 2400);
+        }, 1200);
       } else {
         playMagicChime('error');
         setErrorMessage(

@@ -19,7 +19,7 @@ import {
 } from '../services/nativePrintService';
 import { syncService } from '../services/syncService';
 import { VoiceAiButton } from './VoiceAiButton';
-import { VoiceAiParseResult } from '../services/voiceAiService';
+import { VoiceAiParseResult, playMagicChime } from '../services/voiceAiService';
 import { AutocompleteInput } from './AutocompleteInput';
 import { FormattedNumberInput } from './FormattedNumberInput';
 import { ReceiptPreview } from './ReceiptPreview';
@@ -38,6 +38,8 @@ import {
   ArrowRight,
   Tag,
   Bluetooth,
+  Search,
+  X,
 } from 'lucide-react';
 
 const CART_STORAGE_KEY = 'mte_pos_pending_cart';
@@ -94,6 +96,64 @@ export const KasirView: React.FC<KasirViewProps> = ({
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
   const [negoTargetItem, setNegoTargetItem] = useState<CartItem | null>(null);
   const [isNegoModalOpen, setIsNegoModalOpen] = useState<boolean>(false);
+
+  // Nomor 5: State Snapshot Undo Suara Kasir (Safety Net)
+  interface VoiceUndoSnapshot {
+    cartItems: CartItem[];
+    cashAmount: string;
+    paymentMethod: 'cash' | 'transfer' | 'qris';
+    customerName: string;
+    message: string;
+  }
+  const [voiceUndoSnapshot, setVoiceUndoSnapshot] = useState<VoiceUndoSnapshot | null>(null);
+  const [undoSecondsRemaining, setUndoSecondsRemaining] = useState<number>(7);
+  const undoTimerRef = useRef<any>(null);
+
+  // Paket Kasir Lengkap: State Modal Cek Stok / Tanya Harga via Suara
+  interface StockQueryDialogData {
+    productName: string;
+    matchedProduct?: Product;
+    message?: string;
+  }
+  const [stockQueryModalData, setStockQueryModalData] = useState<StockQueryDialogData | null>(null);
+
+  // Countdown timer untuk baris Undo Suara
+  useEffect(() => {
+    if (voiceUndoSnapshot) {
+      if (undoTimerRef.current) clearInterval(undoTimerRef.current);
+      setUndoSecondsRemaining(7);
+      undoTimerRef.current = setInterval(() => {
+        setUndoSecondsRemaining((prev) => {
+          if (prev <= 1) {
+            clearInterval(undoTimerRef.current);
+            undoTimerRef.current = null;
+            setVoiceUndoSnapshot(null);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (undoTimerRef.current) {
+        clearInterval(undoTimerRef.current);
+        undoTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (undoTimerRef.current) clearInterval(undoTimerRef.current);
+    };
+  }, [voiceUndoSnapshot]);
+
+  const handleTriggerVoiceUndo = () => {
+    if (!voiceUndoSnapshot) return;
+    setCartItems(voiceUndoSnapshot.cartItems);
+    setCashAmount(voiceUndoSnapshot.cashAmount);
+    setPaymentMethod(voiceUndoSnapshot.paymentMethod);
+    setCustomerName(voiceUndoSnapshot.customerName);
+    playMagicChime('undo');
+    showToast('Perubahan suara berhasil diurungkan!', 'info');
+    setVoiceUndoSnapshot(null);
+  };
 
   const nameInputRef = useRef<HTMLInputElement>(null);
   const priceInputRef = useRef<HTMLInputElement>(null);
@@ -456,12 +516,208 @@ export const KasirView: React.FC<KasirViewProps> = ({
   const isInsufficientCash =
     paymentMethod === 'cash' && numericCash > 0 && numericCash < totalAmount;
 
-  // Handler hasil dari Voice AI Assistant
+  // Handler hasil dari Voice AI Assistant (Paket Kasir Lengkap & Undo Safety Net)
   const handleVoiceAiResult = (result: VoiceAiParseResult) => {
+    // 1. CLEAR_CART (Kosongkan keranjang)
+    if (result.action === 'CLEAR_CART') {
+      if (cartItems.length === 0) {
+        showToast('Keranjang belanja sudah kosong.', 'info');
+        return;
+      }
+      setVoiceUndoSnapshot({
+        cartItems: [...cartItems],
+        cashAmount,
+        paymentMethod,
+        customerName,
+        message: 'Keranjang belanja dikosongkan',
+      });
+      setCartItems([]);
+      showToast('🗑️ Seluruh isi keranjang belanja telah dikosongkan.', 'info');
+      return;
+    }
+
+    // 2. RESET_TRANSACTION (Reset Transaksi Baru)
+    if (result.action === 'RESET_TRANSACTION') {
+      setVoiceUndoSnapshot({
+        cartItems: [...cartItems],
+        cashAmount,
+        paymentMethod,
+        customerName,
+        message: 'Transaksi kasir direset',
+      });
+      handleResetTransaction();
+      showToast('🔄 Transaksi kasir telah direset.', 'info');
+      return;
+    }
+
+    // 3. CHECK_STOCK (Cek Stok / Tanya Harga via Suara)
+    if (result.action === 'CHECK_STOCK') {
+      const qName = result.queryInfo?.productName || result.rawTranscript;
+      const matches = searchProducts(qName);
+      const matched = matches[0]?.product;
+
+      setStockQueryModalData({
+        productName: matched?.name || qName,
+        matchedProduct: matched,
+        message:
+          result.queryInfo?.message ||
+          (matched
+            ? `Harga: ${formatRupiah(matched.price)} / ${matched.unit || 'Pcs'}`
+            : `Barang "${qName}" belum terdaftar di database katalog toko.`),
+      });
+      return;
+    }
+
+    // 4. OPEN_PAYMENT (Buka Menu Bayar)
+    if (result.action === 'OPEN_PAYMENT') {
+      handleOpenPaymentModal();
+      return;
+    }
+
+    // 5. FINALIZE_PAYMENT (Bayar Lunas / Uang Pas)
+    if (result.action === 'FINALIZE_PAYMENT') {
+      if (cartItems.length === 0) {
+        showToast('Keranjang masih kosong, tambahkan barang terlebih dahulu.', 'info');
+        return;
+      }
+      if (result.payment?.cashAmount && result.payment.cashAmount > 0) {
+        setCashAmount(result.payment.cashAmount.toString());
+      } else {
+        setCashAmount(totalAmount.toString());
+      }
+      setPaymentMethod('cash');
+      setIsPaymentModalOpen(true);
+      return;
+    }
+
+    // 6. APPLY_DISCOUNT (Nego / Diskon Cepat via Suara)
+    if (result.action === 'APPLY_DISCOUNT') {
+      if (cartItems.length === 0) {
+        showToast('Keranjang masih kosong untuk diberi diskon.', 'info');
+        return;
+      }
+      const discount = result.discountAmount || 0;
+      if (discount <= 0) {
+        showToast('Nominal diskon tidak valid.', 'info');
+        return;
+      }
+
+      setVoiceUndoSnapshot({
+        cartItems: [...cartItems],
+        cashAmount,
+        paymentMethod,
+        customerName,
+        message: `Diskon ${formatRupiah(discount)} diterapkan`,
+      });
+
+      const targetName = (result.discountTargetItemName || '').toLowerCase().trim();
+      let updatedCart = [...cartItems];
+
+      if (targetName) {
+        const idx = updatedCart.findIndex(
+          (c) => c.name.toLowerCase().includes(targetName) || targetName.includes(c.name.toLowerCase())
+        );
+        if (idx !== -1) {
+          const item = updatedCart[idx];
+          const newPrice = Math.max(0, item.price - discount);
+          updatedCart[idx] = {
+            ...item,
+            price: newPrice,
+            isNego: true,
+            subtotal: newPrice * item.qty,
+          };
+          setCartItems(updatedCart);
+          showToast(`🏷️ Diskon ${formatRupiah(discount)} diberikan pada ${item.name}`, 'success');
+          return;
+        }
+      }
+
+      // Default: beri diskon pada item terakhir di keranjang
+      const lastIdx = updatedCart.length - 1;
+      const lastItem = updatedCart[lastIdx];
+      const newPrice = Math.max(0, lastItem.price - discount);
+      updatedCart[lastIdx] = {
+        ...lastItem,
+        price: newPrice,
+        isNego: true,
+        subtotal: newPrice * lastItem.qty,
+      };
+      setCartItems(updatedCart);
+      showToast(`🏷️ Diskon ${formatRupiah(discount)} diberikan pada ${lastItem.name}`, 'success');
+      return;
+    }
+
+    // 7. REMOVE_ITEM (Hapus / Batalkan Barang dari Keranjang)
+    if (result.action === 'REMOVE_ITEM') {
+      if (cartItems.length === 0) {
+        showToast('Keranjang belanja sudah kosong.', 'info');
+        return;
+      }
+
+      setVoiceUndoSnapshot({
+        cartItems: [...cartItems],
+        cashAmount,
+        paymentMethod,
+        customerName,
+        message: 'Barang dihapus dari struk',
+      });
+
+      if (result.removeTarget?.lastItem) {
+        const last = cartItems[cartItems.length - 1];
+        setCartItems(cartItems.slice(0, -1));
+        showToast(`🗑️ Barang terakhir "${last.name}" dihapus dari struk.`, 'info');
+        return;
+      }
+
+      const targetName = (result.removeTarget?.name || '').toLowerCase().trim();
+      if (!targetName) {
+        showToast('Sebutkan nama barang yang ingin dihapus.', 'info');
+        return;
+      }
+
+      const idx = cartItems.findIndex(
+        (c) => c.name.toLowerCase().includes(targetName) || targetName.includes(c.name.toLowerCase())
+      );
+
+      if (idx === -1) {
+        showToast(`Barang "${result.removeTarget?.name}" tidak ditemukan di keranjang.`, 'info');
+        return;
+      }
+
+      const targetItem = cartItems[idx];
+      const removeQty = result.removeTarget?.qty;
+
+      if (removeQty && removeQty < targetItem.qty) {
+        const updatedCart = [...cartItems];
+        const newQty = targetItem.qty - removeQty;
+        updatedCart[idx] = {
+          ...targetItem,
+          qty: newQty,
+          subtotal: targetItem.price * newQty,
+        };
+        setCartItems(updatedCart);
+        showToast(`Barang "${targetItem.name}" dikurangi ${removeQty} ${targetItem.unit}.`, 'info');
+      } else {
+        setCartItems(cartItems.filter((_, i) => i !== idx));
+        showToast(`🗑️ Barang "${targetItem.name}" dihapus dari keranjang.`, 'info');
+      }
+      return;
+    }
+
+    // 8. DEFAULT: ADD_ITEMS (Tambah Barang ke Keranjang)
     if (!result.items || result.items.length === 0) {
       showToast('Tidak ada barang yang terdeteksi dari ucapan suara.', 'info');
       return;
     }
+
+    // Simpan snapshot untuk Undo
+    setVoiceUndoSnapshot({
+      cartItems: [...cartItems],
+      cashAmount,
+      paymentMethod,
+      customerName,
+      message: `${result.items.length} barang masuk ke struk`,
+    });
 
     let updatedCart = [...cartItems];
     let totalQty = 0;
@@ -548,7 +804,7 @@ export const KasirView: React.FC<KasirViewProps> = ({
       focusInput(priceInputRef);
     } else {
       showToast(
-        `✨ Ajaib! ${result.items.length} barang (${totalQty} unit) berhasil digenerate oleh AI ke struk`,
+        `✨ Ajaib! ${result.items.length} barang (${totalQty} unit) berhasil masuk ke struk`,
         'success'
       );
     }
@@ -1108,6 +1364,162 @@ export const KasirView: React.FC<KasirViewProps> = ({
         isActive={isActive}
         hasCart={cartItems.length > 0}
       />
+
+      {/* Nomor 5: Floating Safety Net - Undo Bar Suara Kasir */}
+      {voiceUndoSnapshot && (
+        <div className="voice-undo-floating-banner" role="alert">
+          <div className="voice-undo-content">
+            <div className="voice-undo-info">
+              <Sparkles size={16} className="voice-undo-sparkle" />
+              <span className="voice-undo-text">
+                {voiceUndoSnapshot.message}
+              </span>
+            </div>
+            <div className="voice-undo-actions">
+              <button
+                type="button"
+                className="voice-undo-btn"
+                onClick={handleTriggerVoiceUndo}
+                title="Batalkan perubahan suara ini"
+              >
+                <RotateCcw size={14} />
+                Urungkan ({undoSecondsRemaining}d)
+              </button>
+              <button
+                type="button"
+                className="voice-undo-dismiss-btn"
+                onClick={() => setVoiceUndoSnapshot(null)}
+                title="Tutup"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+          <div className="voice-undo-progress-track">
+            <div
+              className="voice-undo-progress-fill"
+              style={{ width: `${(undoSecondsRemaining / 7) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Paket Kasir Lengkap: Dialog Hasil Cek Stok / Tanya Harga via Suara */}
+      {stockQueryModalData && (
+        <div className="modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="modal-container voice-stock-modal">
+            <div className="voice-stock-modal-header">
+              <div className="voice-stock-title-wrap">
+                <div className="voice-stock-icon-badge">
+                  <Search size={18} />
+                </div>
+                <div>
+                  <h3 className="voice-stock-title">
+                    Informasi Produk & Stok
+                  </h3>
+                  <span className="voice-stock-subtitle">Hasil pencarian suara kasir</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="voice-stock-close-btn"
+                onClick={() => setStockQueryModalData(null)}
+                title="Tutup"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="voice-stock-modal-body">
+              {stockQueryModalData.matchedProduct ? (
+                <div className="voice-stock-detail-wrap">
+                  <div>
+                    <span className="voice-stock-field-label">
+                      Nama Barang
+                    </span>
+                    <h4 className="voice-stock-product-name">
+                      {stockQueryModalData.matchedProduct.name}
+                    </h4>
+                    {stockQueryModalData.matchedProduct.category && (
+                      <span className="badge badge-info" style={{ marginTop: 6, display: 'inline-block' }}>
+                        Kategori: {stockQueryModalData.matchedProduct.category}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="voice-stock-price-card">
+                    <div>
+                      <span className="voice-stock-price-label">
+                        Harga Jual ({stockQueryModalData.matchedProduct.unit || 'Pcs'}):
+                      </span>
+                      <div className="voice-stock-price-value">
+                        {formatRupiah(stockQueryModalData.matchedProduct.price)}
+                      </div>
+                    </div>
+                    <span className="badge badge-success" style={{ padding: '6px 12px', fontSize: '0.82rem' }}>
+                      Tersedia di Toko
+                    </span>
+                  </div>
+
+                  {stockQueryModalData.matchedProduct.aliases && stockQueryModalData.matchedProduct.aliases.length > 0 && (
+                    <div className="voice-stock-aliases">
+                      <strong>Alias / Slang Toko:</strong> {stockQueryModalData.matchedProduct.aliases.join(', ')}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="voice-stock-not-found">
+                  <p className="voice-stock-not-found-title">
+                    Barang "{stockQueryModalData.productName}"
+                  </p>
+                  <p className="voice-stock-not-found-desc">
+                    {stockQueryModalData.message || 'Barang belum terdaftar di database katalog toko.'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="voice-stock-modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setStockQueryModalData(null)}
+              >
+                Tutup
+              </button>
+              {stockQueryModalData.matchedProduct && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const p = stockQueryModalData.matchedProduct!;
+                    handleVoiceAiResult({
+                      success: true,
+                      rawTranscript: '',
+                      action: 'ADD_ITEMS',
+                      summary: `1 ${p.name} ditambahkan`,
+                      items: [
+                        {
+                          matchedProductId: p.id,
+                          name: p.name,
+                          price: p.price,
+                          qty: 1,
+                          unit: p.unit || 'Pcs',
+                          isNew: false,
+                        },
+                      ],
+                    });
+                    setStockQueryModalData(null);
+                  }}
+                >
+                  <Plus size={16} />
+                  + Masukkan ke Struk (1 {stockQueryModalData.matchedProduct.unit || 'Pcs'})
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
